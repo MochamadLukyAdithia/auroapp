@@ -73,6 +73,8 @@ class _VerificationPageState extends State<VerificationPage> {
   }
 }
 
+// ---------------- Widget ----------------
+
 class OTPBox extends StatelessWidget {
   const OTPBox({
     super.key,

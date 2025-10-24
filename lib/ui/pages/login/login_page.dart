@@ -54,6 +54,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
+
+// ---------------- Widget ----------------
+
 // Email
 class Email extends StatelessWidget {
   const Email({
@@ -65,7 +68,7 @@ class Email extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: _emailController,
       decoration: const InputDecoration(
         labelText: 'Email',
@@ -91,7 +94,7 @@ class Password extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: _passwordController,
       obscureText: obscurePassword,
       decoration: InputDecoration(

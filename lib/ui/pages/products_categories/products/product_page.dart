@@ -222,6 +222,48 @@ class PriceField extends StatelessWidget {
 class WeightAndUnitField extends StatelessWidget {
   const WeightAndUnitField({super.key});
 
+  void _showAddUnitDialog(BuildContext context) {
+    final controller = TextEditingController();
+
+    // dialog nambah satuan berat
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Tambah Satuan'),
+          content: SizedBox(
+            width: 250,
+            child: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Nama Satuan',
+                hintText: 'Contoh: Liter',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                isDense: true,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  Navigator.pop(context, controller.text);
+                }
+              },
+              child: const Text('Tambahkan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // show modal bawah
   void _showUnitBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -248,9 +290,19 @@ class WeightAndUnitField extends StatelessWidget {
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
-                      itemCount: 6,
+                      itemCount: 7,
                       itemBuilder: (context, index) {
-                        final unitName = ['Kg', 'Gram', 'Pcs', 'Sachet', 'Gelas', 'lainnya',][index];
+                        if (index == 6) {
+                          return ListTile(
+                            leading: const Icon(Icons.add_circle_outline),
+                            title: const Text('Tambahkan'),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showAddUnitDialog(context);
+                            },
+                          );
+                        }
+                        final unitName = ['Kg', 'Gram', 'Pcs', 'Sachet', 'Gelas', 'Liter'][index];
                         return ListTile(
                           title: Text(unitName),
                           onTap: () => Navigator.pop(context, unitName),
