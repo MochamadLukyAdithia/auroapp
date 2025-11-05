@@ -3,7 +3,7 @@
    <application
         android:label="pos_mobile"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@style/LaunchTheme">
         <activity
             android:name=".MainActivity"
             android:exported="true"
