@@ -18,12 +18,33 @@ class SettingPage extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
           MenuTile(
+            icon: Icons.business,
+            title: 'Profil Toko',
+            onTap: () {
+              Navigator.pushNamed(context, AppRoutes.shop);
+            },
+          ),
+
+          const Divider(height: 1),
+
+          MenuTile(
+            icon: Icons.business,
+            title: 'Profil Owner',
+            onTap: () {
+              Navigator.pushNamed(context, AppRoutes.ownerProfile);
+            },
+          ),
+
+          const Divider(height: 1),
+
+          MenuTile(
             icon: Icons.group,
             title: 'Manajemen Pengguna',
             onTap: () {
               Navigator.pushNamed(context, AppRoutes.cashier);
             },
           ),
+
           const Divider(height: 1),
 
           MenuTile(
@@ -33,16 +54,6 @@ class SettingPage extends StatelessWidget {
               Navigator.pushNamed(context, AppRoutes.paymentMethod);
             },
           ),
-          const Divider(height: 1),
-
-          MenuTile(
-            icon: Icons.business,
-            title: 'Profil Toko',
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.shop);
-            },
-          ),
-          const Divider(height: 1),
         ],
       ),
     );
