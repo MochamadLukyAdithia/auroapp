@@ -5,7 +5,14 @@ import 'package:pos_mobile/core/theme/theme.dart';
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<String>? tabs;
-  const CustomAppBar({super.key, required this.title, this.tabs});
+  final TabController? tabController;
+
+  const CustomAppBar({
+    super.key,
+    required this.title,
+    this.tabs,
+    this.tabController,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +50,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       bottom: tabs != null
           ? TabBar(
+        controller: tabController,
         tabs: tabs!
             .map(
               (t) => Tab(
