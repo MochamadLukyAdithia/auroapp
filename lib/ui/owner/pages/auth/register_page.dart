@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/route/route.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
+import '../../../../blocs/auth/register/register_bloc.dart';
+import '../../../../blocs/auth/register/register_event.dart';
+import '../../../../blocs/auth/register/register_state.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../widgets/floating_message.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -11,387 +16,443 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    super.dispose();
-  }
+  bool _obscureConfirmPassword = true;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: const CustomAppBar(title: 'Registrasi'),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                const FullName(),
-                const SizedBox(height: 24),
-                const EmailRegister(),
-                const SizedBox(height: 24),
-                PasswordRegister(
-                  passwordController: _passwordController,
-                  obscurePassword: _obscurePassword,
-                  onToggleVisibility: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
+    return BlocListener<RegisterBloc, RegisterState>(
+      listener: (context, state) {
+        if (state.hasExistingOwner) {
+          FloatingMessage.show(
+            context,
+            message: 'Akun owner sudah terdaftar: ${state.existingOwnerEmail}',
+            backgroundColor: Colors.red,
+            icon: Icons.error_outline,
+            duration: const Duration(seconds: 3),
+          );
+          return;
+        }
+
+        if (state.status == RegisterStatus.success) {
+          final userId = state.userId;
+          final email = state.email;
+
+          print('🚀 Navigating with userId: $userId, email: $email'); // ✅ Tambah ini
+
+          FloatingMessage.show(
+            context,
+            message: 'Registrasi berhasil! Silakan verifikasi email',
+            backgroundColor: primaryGreenColor,
+            icon: Icons.check_circle_outline,
+            duration: const Duration(seconds: 2),
+          );
+
+          Future.delayed(const Duration(milliseconds: 1500), () {
+            if (mounted) {
+
+              Navigator.pushReplacementNamed(
+                context,
+                AppRoutes.verification,
+                arguments: {
+                  'userId': userId,
+                  'email': email,
+                },
+              );
+            }
+          });
+        }
+
+        else if (state.status == RegisterStatus.failure) {
+          FloatingMessage.show(
+            context,
+            message: state.errorMessage ?? 'Registrasi gagal',
+            backgroundColor: Colors.red,
+            icon: Icons.error_outline,
+            duration: const Duration(seconds: 3),
+          );
+        }
+      },
+
+      child: Scaffold(
+          backgroundColor: Colors.white,
+          appBar: const CustomAppBar(title: 'Registrasi'),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    const _FullNameField(),
+                    const SizedBox(height: 24),
+                    const _EmailField(),
+                    const SizedBox(height: 24),
+                    _PasswordField(
+                      label: 'Kata Sandi',
+                      hint: 'Masukkan Kata Sandi',
+                      obscureText: _obscurePassword,
+                      onChanged: (value) {
+                        context
+                            .read<RegisterBloc>()
+                            .add(RegisterPasswordChanged(value));
+                      },
+                      onToggleVisibility: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                      errorSelector: (state) => state.passwordError,
+                    ),
+                    const SizedBox(height: 24),
+                    _PasswordField(
+                      label: 'Konfirmasi Kata Sandi',
+                      hint: 'Masukkan Konfirmasi Kata Sandi',
+                      obscureText: _obscureConfirmPassword,
+                      onChanged: (value) {
+                        context
+                            .read<RegisterBloc>()
+                            .add(RegisterConfirmPasswordChanged(value));
+                      },
+                      onToggleVisibility: () {
+                        setState(() =>
+                        _obscureConfirmPassword = !_obscureConfirmPassword);
+                      },
+                      errorSelector: (state) => state.confirmPasswordError,
+                    ),
+                    const SizedBox(height: 24),
+                    const _PhoneField(),
+                    const SizedBox(height: 24),
+                    const _LoginPrompt(),
+                    const SizedBox(height: 32),
+                    const _RegisterButton(),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                const PhoneNumber(),
-                const SizedBox(height: 24),
-                const StoreAddress(),
-                const SizedBox(height: 24),
-                const LoginPrompt(),
-                const SizedBox(height: 32),
-                RegisterButton(
-                  onPressed: () {
-                    // TODO: Handle register logic
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-// ---------------- Full Name Widget ----------------
-class FullName extends StatelessWidget {
-  const FullName({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nama Lengkap',
-          style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          // controller akan dihandle oleh BLoC
-          onChanged: (value) {
-            // context.read<RegisterBloc>().add(RegisterNameChanged(value));
-          },
-          style: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 15,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Masukan Nama Lengkap',
-            hintStyle: TextStyle(
-              fontFamily: fontType,
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
               ),
             ),
           ),
-          keyboardType: TextInputType.name,
         ),
-      ],
-    );
+      );
   }
 }
 
-// ---------------- Email Widget ----------------
-class EmailRegister extends StatelessWidget {
-  const EmailRegister({super.key});
+// ---------------- Full Name Field ----------------
+class _FullNameField extends StatelessWidget {
+  const _FullNameField();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Email',
-          style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          onChanged: (value) {
-            // context.read<RegisterBloc>().add(RegisterEmailChanged(value));
-          },
-          style: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 15,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Masukan Email',
-            hintStyle: TextStyle(
-              fontFamily: fontType,
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
+    return BlocBuilder<RegisterBloc, RegisterState>(
+      builder: (context, state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nama Lengkap',
+              style: TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
               ),
             ),
-          ),
-          keyboardType: TextInputType.emailAddress,
-        ),
-      ],
+            const SizedBox(height: 8),
+            TextFormField(
+              onChanged: (value) {
+                context.read<RegisterBloc>().add(RegisterNameChanged(value));
+              },
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Masukan Nama Lengkap',
+                hintStyle: TextStyle(
+                  fontFamily: fontType,
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                errorText: state.nameError,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: primaryGreenColor,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+              ),
+              keyboardType: TextInputType.name,
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-// ---------------- Password Widget ----------------
-class PasswordRegister extends StatelessWidget {
-  const PasswordRegister({
-    super.key,
-    required TextEditingController passwordController,
-    required this.obscurePassword,
-    required this.onToggleVisibility,
-  }) : _passwordController = passwordController;
+// ---------------- Email Field ----------------
+class _EmailField extends StatelessWidget {
+  const _EmailField();
 
-  final TextEditingController _passwordController;
-  final bool obscurePassword;
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<RegisterBloc, RegisterState>(
+      builder: (context, state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Email',
+              style: TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              onChanged: (value) {
+                context.read<RegisterBloc>().add(RegisterEmailChanged(value));
+              },
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Masukan Email',
+                hintStyle: TextStyle(
+                  fontFamily: fontType,
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                errorText: state.emailError,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: primaryGreenColor,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ---------------- Password Field ----------------
+class _PasswordField extends StatelessWidget {
+  final String label;
+  final String hint;
+  final bool obscureText;
+  final Function(String) onChanged;
   final VoidCallback onToggleVisibility;
+  final String? Function(RegisterState) errorSelector;
+
+  const _PasswordField({
+    required this.label,
+    required this.hint,
+    required this.obscureText,
+    required this.onChanged,
+    required this.onToggleVisibility,
+    required this.errorSelector,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Kata Sandi',
-          style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: obscurePassword,
-          style: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 15,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Masukan Kata Sandi',
-            hintStyle: TextStyle(
-              fontFamily: fontType,
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
+    return BlocBuilder<RegisterBloc, RegisterState>(
+      builder: (context, state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
               ),
             ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscurePassword ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey[600],
+            const SizedBox(height: 8),
+            TextFormField(
+              onChanged: onChanged,
+              obscureText: obscureText,
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 15,
               ),
-              onPressed: onToggleVisibility,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(
+                  fontFamily: fontType,
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                errorText: errorSelector(state),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: primaryGreenColor,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscureText ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey[600],
+                  ),
+                  onPressed: onToggleVisibility,
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
 
-// ---------------- Phone Number Widget ----------------
-class PhoneNumber extends StatelessWidget {
-  const PhoneNumber({super.key});
+// ---------------- Phone Field ----------------
+class _PhoneField extends StatelessWidget {
+  const _PhoneField();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nomor Handphone',
-          style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          onChanged: (value) {
-            // context.read<RegisterBloc>().add(RegisterPhoneChanged(value));
-          },
-          style: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 15,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Masukan Nomor Handphone',
-            hintStyle: TextStyle(
-              fontFamily: fontType,
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
+    return BlocBuilder<RegisterBloc, RegisterState>(
+      builder: (context, state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nomor Handphone',
+              style: TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
               ),
             ),
-          ),
-          keyboardType: TextInputType.phone,
-        ),
-      ],
+            const SizedBox(height: 8),
+            TextFormField(
+              onChanged: (value) {
+                context.read<RegisterBloc>().add(RegisterPhoneChanged(value));
+              },
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Masukan Nomor Handphone',
+                hintStyle: TextStyle(
+                  fontFamily: fontType,
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                errorText: state.phoneError,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                    color: primaryGreenColor,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-// ---------------- Store Address Widget ----------------
-class StoreAddress extends StatelessWidget {
-  const StoreAddress({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Alamat Toko',
-          style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          onChanged: (value) {
-            // context.read<RegisterBloc>().add(RegisterAddressChanged(value));
-          },
-          maxLines: 3,
-          style: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 15,
-          ),
-          decoration: InputDecoration(
-            hintText: 'Masukan Alamat Toko',
-            hintStyle: TextStyle(
-              fontFamily: fontType,
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
-              ),
-            ),
-          ),
-          keyboardType: TextInputType.streetAddress,
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------- Login Prompt Widget ----------------
-class LoginPrompt extends StatelessWidget {
-  const LoginPrompt({super.key});
+// ---------------- Login Prompt ----------------
+class _LoginPrompt extends StatelessWidget {
+  const _LoginPrompt();
 
   @override
   Widget build(BuildContext context) {
@@ -424,36 +485,50 @@ class LoginPrompt extends StatelessWidget {
 }
 
 // ---------------- Register Button ----------------
-class RegisterButton extends StatelessWidget {
-  const RegisterButton({
-    super.key,
-    required this.onPressed,
-  });
-
-  final VoidCallback onPressed;
+class _RegisterButton extends StatelessWidget {
+  const _RegisterButton();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryGreenColor,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+    return BlocBuilder<RegisterBloc, RegisterState>(
+      builder: (context, state) {
+        final isLoading = state.status == RegisterStatus.loading;
+
+        return SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreenColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+              textStyle: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onPressed: isLoading
+                ? null
+                : () {
+              context.read<RegisterBloc>().add(const RegisterSubmitted());
+            },
+            child: isLoading
+                ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+                : const Text('Daftar'),
           ),
-          elevation: 0,
-          textStyle: const TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        onPressed: onPressed,
-        child: const Text('Daftar'),
-      ),
+        );
+      },
     );
   }
 }
