@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../../blocs/category/category_bloc.dart';
+import '../../../../../blocs/category/category_event.dart';
+import '../../../../../blocs/category/category_state.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../widgets/custom_app_bar.dart';
+import '../../../../widgets/floating_message.dart';
 
 class AddCategoryPage extends StatefulWidget {
   const AddCategoryPage({super.key});
@@ -11,21 +15,64 @@ class AddCategoryPage extends StatefulWidget {
 }
 
 class _AddCategoryPageState extends State<AddCategoryPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _saveCategory() {
+    if (_formKey.currentState!.validate()) {
+      context.read<CategoryBloc>().add(
+        AddCategory(name: _nameController.text),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: CustomAppBar(
+    return Scaffold(
+      appBar: const CustomAppBar(
         title: 'Tambah Kategori',
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            CategoryNameField(),
-            SizedBox(height: 20),
-            SaveButton(),
-          ],
-        ),
+      body: BlocConsumer<CategoryBloc, CategoryState>(
+        listener: (context, state) {
+          if (state is CategoryActionSuccess) {
+            FloatingMessage.show(
+              context,
+              message: state.message,
+              backgroundColor: primaryGreenColor,
+            );
+            Navigator.pop(context, true);
+          } else if (state is CategoryError) {
+            FloatingMessage.show(
+              context,
+              message: state.message,
+              backgroundColor: Colors.red,
+            );
+          }
+        },
+        builder: (context, state) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  CategoryNameField(controller: _nameController),
+                  const SizedBox(height: 20),
+                  SaveButton(
+                    onPressed: _saveCategory,
+                    isLoading: state is CategoryLoading,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -34,7 +81,9 @@ class _AddCategoryPageState extends State<AddCategoryPage> {
 // ---------------- Widget ----------------
 
 class CategoryNameField extends StatelessWidget {
-  const CategoryNameField({super.key});
+  final TextEditingController controller;
+
+  const CategoryNameField({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +91,29 @@ class CategoryNameField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Nama kategori',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontFamily: fontType),
+          'Nama kategori*',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            fontFamily: fontType,
+          ),
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Nama kategori tidak boleh kosong';
+            }
+            return null;
+          },
           decoration: InputDecoration(
-            hintText: 'Tambahkan kategori',
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14, fontFamily: fontType),
+            hintText: 'Contoh: Minuman',
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
+              fontFamily: fontType,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -58,7 +122,8 @@ class CategoryNameField extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
         ),
       ],
@@ -66,9 +131,15 @@ class CategoryNameField extends StatelessWidget {
   }
 }
 
-
 class SaveButton extends StatelessWidget {
-  const SaveButton({super.key});
+  final VoidCallback onPressed;
+  final bool isLoading;
+
+  const SaveButton({
+    super.key,
+    required this.onPressed,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -76,14 +147,24 @@ class SaveButton extends StatelessWidget {
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreenColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          disabledBackgroundColor: primaryGreenColor.withOpacity(0.5),
         ),
-        child: const Text(
+        child: isLoading
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
+            : const Text(
           'Simpan',
           style: TextStyle(
             fontSize: 16,
