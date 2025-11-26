@@ -3,9 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_mobile/route/route.dart';
+import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
+import '../../../../../../blocs/history_stock/stock_bloc.dart';
 import '../../../../../../blocs/transaction/transaction_cubit.dart';
+import '../../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../widgets/floating_message.dart';
 
 class CashPayment extends StatelessWidget {
   const CashPayment({super.key});
@@ -17,60 +21,171 @@ class CashPayment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final transactionCubit = context.watch<TransactionCubit>();
-    final totalTagihan = transactionCubit.state.totalPayment;
-    final uangDiterima = transactionCubit.state.receivedAmount;
-    final kembalian = uangDiterima != null
-        ? (uangDiterima - totalTagihan).clamp(0, double.infinity).toInt()
-        : 0;
+    return PopScope(  // ✅ TAMBAH INI
+        onPopInvoked: (didPop) {
+          if (didPop) {
+            context.read<TransactionCubit>().setReceivedAmount(null);
+          }
+        },
+      child: BlocBuilder<TransactionCubit, TransactionState>(
+      builder: (context, state) {
+        final totalTagihan = state.finalTotal;
+        final uangDiterima = state.receivedAmount;
+        final kembalian = state.changeAmount; // Pakai helper dari state
+        final isPaymentValid = state.isPaymentSufficient;
 
-    return Scaffold(
-      appBar: const CustomAppBar(title: 'Tunai'),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TotalPaymentCard(
-              total: totalTagihan,
-              format: _formatCurrency,
+        return Scaffold(
+          appBar: const CustomAppBar(title: 'Tunai'),
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TotalPaymentCard(
+                  total: totalTagihan,
+                  format: _formatCurrency,
+                ),
+                const SizedBox(height: 16),
+
+                NominalButton(
+                  totalTagihan: totalTagihan,
+                  selectedNominal: uangDiterima,
+                  onSelect: (nominal) {
+                    context.read<TransactionCubit>().setReceivedAmount(nominal);
+                  },
+                  onCustomNominal: () async {
+                    final nominal = await _showCustomNominalDialog(context);
+                    if (nominal != null) {
+                      context.read<TransactionCubit>().setReceivedAmount(nominal);
+                    }
+                  },
+                  formatCurrency: _formatCurrency,
+                ),
+
+                const SizedBox(height: 20),
+
+                // ===== BAGIAN KEMBALIAN DIPERBAIKI =====
+                if (uangDiterima != null) ...[
+                  // Tampilkan uang yang diterima
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Uang Diterima',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatCurrency(uangDiterima),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tampilkan kembalian atau warning
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isPaymentValid
+                          ? Colors.green.shade50
+                          : Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isPaymentValid
+                            ? Colors.green.shade200
+                            : Colors.red.shade200,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPaymentValid ? 'Kembalian' : '⚠️ Uang Kurang',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isPaymentValid ? Colors.grey : Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isPaymentValid
+                              ? _formatCurrency(kembalian)
+                              : 'Kurang ${_formatCurrency(totalTagihan - uangDiterima)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isPaymentValid ? primaryGreenColor : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const Spacer(),
+
+                // Button bayar (disabled kalau uang kurang)
+                PayButton(
+                  isEnabled: uangDiterima != null && isPaymentValid,
+                  onPressed: () async {
+                    final cubit = context.read<TransactionCubit>();
+                    final state = cubit.state;
+
+                    // 🆕 VALIDASI STOK DULU
+                    bool hasStockIssue = false;
+                    String errorMessage = '';
+                    for (var product in state.selectedItems) {
+                      final qty = state.getQuantity(product.id.toString());
+                      final stock = product.productStock;
+
+                      if (qty > stock) {
+                        hasStockIssue = true;
+                        errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
+                            'Tersedia: $stock, Dipilih: $qty';
+                        break;
+                      }
+                    }
+
+                    if (hasStockIssue) {
+                      FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                      return;
+                    }
+                    cubit.completeCashPayment();
+                    final stockBloc = context.read<StockBloc>();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MultiBlocProvider(
+                          providers: [
+                            BlocProvider.value(value: cubit),
+                            BlocProvider.value(value: stockBloc),
+                          ],
+                          child: const TransactionSuccess(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            NominalButton(
-              totalTagihan: totalTagihan,
-              selectedNominal: uangDiterima,
-              onSelect: (nominal) {
-                transactionCubit.setReceivedAmount(nominal);
-              },
-              onCustomNominal: () async {
-                final nominal = await _showCustomNominalDialog(context);
-                if (nominal != null) {
-                  transactionCubit.setReceivedAmount(nominal);
-                }
-              },
-              formatCurrency: _formatCurrency, customNominal: null,
-            ),
-
-            const SizedBox(height: 20),
-
-            if (uangDiterima != null)
-              Text(
-                'Kembalian: ${_formatCurrency(kembalian)}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-
-            const Spacer(),
-            PayButton(
-              isEnabled: uangDiterima != null,
-              onPressed: () {
-                transactionCubit.completeTransaction();
-                Navigator.pushNamed(context, AppRoutes.transactionSuccess);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
+      },
+    ));
   }
 
   Future<int?> _showCustomNominalDialog(BuildContext context) async {
@@ -79,12 +194,20 @@ class CashPayment extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Nominal Lainnya'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            prefixText: 'Rp ',
-            hintText: '0',
+        content: SingleChildScrollView( // ✅ TAMBAH INI
+          child: Column( // ✅ WRAP DENGAN COLUMN
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true, // ✅ OPSIONAL: auto focus
+                decoration: const InputDecoration(
+                  prefixText: 'Rp ',
+                  hintText: '0',
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -151,7 +274,6 @@ class TotalPaymentCard extends StatelessWidget {
 
 class NominalButton extends StatelessWidget {
   final int? selectedNominal;
-  final int? customNominal;
   final void Function(int) onSelect;
   final VoidCallback onCustomNominal;
   final int totalTagihan;
@@ -160,7 +282,6 @@ class NominalButton extends StatelessWidget {
   const NominalButton({
     super.key,
     required this.selectedNominal,
-    required this.customNominal,
     required this.onSelect,
     required this.onCustomNominal,
     required this.totalTagihan,
@@ -173,37 +294,28 @@ class NominalButton extends StatelessWidget {
       {'label': 'Uang Pas', 'value': totalTagihan},
       {'label': 'Rp 5.000', 'value': 5000},
       {'label': 'Rp 10.000', 'value': 10000},
-      {'label': 'Nominal Lainnya', 'value': -1},
+      {'label': 'Rp 20.000', 'value': 20000},
+      {'label': 'Rp 50.000', 'value': 50000},
+      {'label': 'Rp 100.000', 'value': 100000},
+      {'label': 'Nominal Lainnya', 'value': null}, // null untuk custom
     ];
 
-    return Column(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (var item in nominalOptions)
-              _NominalButton(
-                label: item['label'],
-                isSelected: selectedNominal == item['value'],
-                onTap: () {
-                  if (item['value'] == -1) {
-                    onCustomNominal();
-                  } else {
-                    onSelect(item['value']);
-                  }
-                },
-              ),
-          ],
-        ),
-        if (selectedNominal == -1 && customNominal != null) ...[
-          const SizedBox(height: 12),
-          _CustomNominalCard(
-            nominal: customNominal!,
-            formatCurrency: formatCurrency,
-            onEdit: onCustomNominal,
+        for (var item in nominalOptions)
+          _NominalButton(
+            label: item['label'],
+            isSelected: selectedNominal == item['value'],
+            onTap: () {
+              if (item['value'] == null) {
+                onCustomNominal();
+              } else {
+                onSelect(item['value']);
+              }
+            },
           ),
-        ],
       ],
     );
   }
