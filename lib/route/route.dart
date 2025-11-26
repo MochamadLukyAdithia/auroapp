@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart'; // ✅ Tambahkan import ini
 import 'package:pos_mobile/ui/owner/pages/auth/register_page.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/add_finance.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/filtered_finance_date.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/finance_page.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/update_finance.dart';
+import 'package:pos_mobile/ui/owner/pages/more/profile_cashier/profile_cashier.dart';
+import 'package:pos_mobile/ui/owner/pages/more/profile_cashier/update_profile_cashier.dart';
 import 'package:pos_mobile/ui/owner/pages/more/settings/cashiers/add_cashier.dart';
+import 'package:pos_mobile/ui/owner/pages/more/settings/owner_profile/owner_profile.dart';
 import 'package:pos_mobile/ui/owner/pages/more/settings/payment_methods/add_payment_method_page.dart';
 import 'package:pos_mobile/ui/owner/pages/more/settings/payment_methods/payment_method_page.dart';
+import 'package:pos_mobile/ui/owner/pages/more/settings/shop/shop_page_update.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/bank.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/cash.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/choose_customer.dart';
@@ -14,21 +19,24 @@ import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_payment.dart
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_transaction.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/e-wallet.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
+import '../blocs/customer/customer_bloc.dart'; // ✅ Tambahkan import CustomerBloc
+import '../data/models/customer_model.dart';
 import '../ui/owner/pages/auth/login_page.dart';
 import '../ui/owner/pages/auth/verification_page.dart';
 import '../ui/owner/pages/more/about/about_page.dart';
 import '../ui/owner/pages/more/customers/add_customer_page.dart';
 import '../ui/owner/pages/more/customers/customer_page.dart';
+import '../ui/owner/pages/more/customers/update_customer_page.dart';
 import '../ui/owner/pages/more/guide/guide_page.dart';
 import '../ui/owner/pages/more/more_page.dart';
 import '../ui/owner/pages/more/purchases/purchase_completed.dart';
 import '../ui/owner/pages/more/purchases/purchase_detail.dart';
 import '../ui/owner/pages/more/purchases/purchase_page.dart';
 import '../ui/owner/pages/more/purchases/purchase_payment.dart';
-import '../ui/owner/pages/more/report/flow_report.dart';
-import '../ui/owner/pages/more/report/expenditure_report.dart';
+import '../ui/owner/pages/more/report/flow/flow_report.dart';
+import '../ui/owner/pages/more/report/expenditure/expenditure_report.dart';
 import '../ui/owner/pages/more/report/report_page.dart';
-import '../ui/owner/pages/more/report/sales_report.dart';
+import '../ui/owner/pages/more/report/sales/sales_report.dart';
 import '../ui/owner/pages/more/settings/cashiers/cashier_page.dart';
 import '../ui/owner/pages/more/settings/setting_page.dart';
 import '../ui/owner/pages/more/settings/shop/shop_page.dart';
@@ -61,15 +69,12 @@ class AppRoutes {
   static const String transaction = '/transaction';
   static const String sale = '/transaction/sale';
   static const String detailTransaction = '/transaction/sale/detail_transaction';
-  static const String chooseCustomer = '/transaction/sale/detail_transaction/choose_customer';
+  static const String customerSelection = '/transaction/sale/customer_selection';
   static const String detailPayment = '/transaction/sale/detail_transaction/detail_payment';
   static const String cashPayment = '/transaction/sale/detail_transaction/detail_payment/cash_payment';
   static const String bankPayment = '/transaction/sale/detail_transaction/detail_payment/bank_payment';
   static const String ewalletPayment = '/transaction/sale/detail_transaction/detail_payment/ewallet_payment';
   static const String transactionSuccess = '/transaction/sale/detail_transaction/detail_payment/transaction_success';
-
-  // static const String preorder = '/transaction/preorder';
-  // static const String QR = '/transaction/QR';
 
   //---------------- FINANCE PAGE ----------------
   static const String finance = '/finance';
@@ -81,16 +86,14 @@ class AppRoutes {
   static const String more = '/more';
   static const String customer = '/more/customer';
   static const String addCustomer = '/more/customer/add_customer';
-
-  // static const String supplier = '/more/supplier'; //Tidak terpakai
-  // static const String addSupplier = '/more/customer/add_supplier'; //Tidak terpakai
+  static const String updateCustomer = '/more/customer/update_customer'; // 🆕 TAMBAHKAN INI
 
   static const String purchase = '/more/purchase';
   static const String purchaseDetail = '/more/purchase/purchase_detail';
   static const String purchaseCompleted = '/more/purchase/purchase_completed';
   static const String purchasePayment = '/more/purchase/purchase_payment';
 
-  static const String report= '/more/report';
+  static const String report = '/more/report';
   static const String flowReport = '/more/report/flow_report';
   static const String expenditureReport = '/more/report/expenditure_report';
   static const String salesReport = '/more/report/sales_report';
@@ -101,6 +104,11 @@ class AppRoutes {
   static const String paymentMethod = '/more/setting/payment_method';
   static const String addPaymentMethod = '/more/setting/payment_method/add_payment_method';
   static const String shop = '/more/setting/shop';
+  static const String updateShop = '/more/setting/shop/update_shop';
+  static const String ownerProfile = '/more/setting/owner_profile';
+  static const String updateOwnerProfile = '/more/setting/owner_profile/update_owner_profile';
+  static const String cashierProfile = '/more/cashier_profile';
+  static const String updateCashierProfile = '/more/cashier_profile/update_cashier_profile';
 
   static const String guide = '/more/guide';
   static const String about = '/more/about';
@@ -118,7 +126,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RegisterPage());
 
       case verification:
-        return MaterialPageRoute(builder: (_) => const VerificationPage());
+        return MaterialPageRoute(builder: (_) => const VerificationPage(),
+        settings: settings);
 
       case homepage:
         return MaterialPageRoute(builder: (_) => const BottomBar());
@@ -129,12 +138,6 @@ class AppRoutes {
 
       case addProduct:
         return MaterialPageRoute(builder: (_) => const AddProductPage());
-
-      case addPrice:
-        return MaterialPageRoute(builder: (_) => const AddPricePage());
-
-      // case category:
-      //   return MaterialPageRoute(builder: (_) => const CategoryPage());
 
       case addCategory:
         return MaterialPageRoute(builder: (_) => const AddCategoryPage());
@@ -149,8 +152,15 @@ class AppRoutes {
       case detailTransaction:
         return MaterialPageRoute(builder: (_) => const DetailTransaction());
 
-      case chooseCustomer:
-        return MaterialPageRoute(builder: (_) => const ChooseCustomer());
+      case customerSelection:
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider.value(
+            value: context.read<CustomerBloc>(),
+            child: const CustomerPage(
+              isSelectionMode: true,
+            ),
+          ),
+        );
 
       case detailPayment:
         return MaterialPageRoute(builder: (_) => const DetailPayment());
@@ -167,52 +177,42 @@ class AppRoutes {
       case transactionSuccess:
         return MaterialPageRoute(builder: (_) => const TransactionSuccess());
 
-      // case preorder:
-      //   return MaterialPageRoute(builder: (_) => const PreorderPage());
-      //
-      // case QR:
-      //   return MaterialPageRoute(builder: (_) => const QrScanner());
-
     // ============ FINANCE ============
       case finance:
         return MaterialPageRoute(builder: (_) => const FinancePage());
 
       case addFinance:
-        return MaterialPageRoute(builder: (_) => const AddFinance());
+        return MaterialPageRoute(builder: (_) => const AddFinancePage());
 
       case filteredFinance:
         return MaterialPageRoute(builder: (_) => const FilteredFinancesPage());
-
-      case updateFinance:
-        return MaterialPageRoute(builder: (_) => const UpdateFinance());
 
     // ============ MORE ============
       case more:
         return MaterialPageRoute(builder: (_) => const MorePage());
 
       case customer:
-        return MaterialPageRoute(builder: (_) => const CustomerPage());
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider.value(
+            value: context.read<CustomerBloc>(),
+            child: const CustomerPage(
+              isSelectionMode: false,
+            ),
+          ),
+        );
 
       case addCustomer:
         return MaterialPageRoute(builder: (_) => const AddCustomerPage());
 
-      // case supplier:
-      //   return MaterialPageRoute(builder: (_) => const SupplierPage());
-      //
-      // case addSupplier:
-      //   return MaterialPageRoute(builder: (_) => const AddSupplierPage());
-
-      // case purchase:
-      //   return MaterialPageRoute(builder: (_) => const PurchasePage());
-      //
-      // case purchaseDetail:
-      //   return MaterialPageRoute(builder: (_) => const PurchaseDetail());
-      //
-      // case purchaseCompleted:
-      //   return MaterialPageRoute(builder: (_) => const PurchaseCompleted());
-      //
-      // case purchasePayment:
-      //   return MaterialPageRoute(builder: (_) => const PurchasePayment());
+    // 🆕 ROUTE UPDATE CUSTOMER
+      case updateCustomer:
+        final customer = settings.arguments as Customer;
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider.value(
+            value: context.read<CustomerBloc>(),
+            child: UpdateCustomerPage(customer: customer),
+          ),
+        );
 
       case report:
         return MaterialPageRoute(builder: (_) => const ReportPage());
@@ -235,11 +235,20 @@ class AppRoutes {
       case paymentMethod:
         return MaterialPageRoute(builder: (_) => const PaymentMethodPage());
 
-      case addPaymentMethod:
-        return MaterialPageRoute(builder: (_) => const AddPaymentMethodPage());
+      case ownerProfile:
+        return MaterialPageRoute(builder: (_) => const OwnerProfile());
+
+      case cashierProfile:
+        return MaterialPageRoute(builder: (_) => const ProfileCashier());
+
+      case updateCashierProfile:
+        return MaterialPageRoute(builder: (_) => const UpdateProfileCashier());
 
       case shop:
         return MaterialPageRoute(builder: (_) => const ShopPage());
+
+      case updateShop:
+        return MaterialPageRoute(builder: (_) => const ShopPageUpdate());
 
       case salesReport:
         return MaterialPageRoute(builder: (_) => const SalesReportPage());
@@ -261,5 +270,4 @@ class AppRoutes {
         );
     }
   }
-
 }
