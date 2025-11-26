@@ -1,6 +1,7 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/theme.dart';
+import '../../core/utils/auth_service.dart';
 import '../owner/pages/finances/finance_page.dart';
 import '../owner/pages/homepage.dart';
 import '../owner/pages/more/more_page.dart';
@@ -15,9 +16,30 @@ class BottomBar extends StatefulWidget {
 }
 
 class _BottomBarState extends State<BottomBar> {
-  int currentIndex = 2; // Default ke POS (index 2)
+  int currentIndex = 0; // ✅ Ubah ke 0 (Beranda default)
+  bool _isOwner = true;
+  bool _isLoading = true; // ✅ Tambah loading state
 
-  final List<Widget> body = [
+  @override
+  void initState() {
+    super.initState();
+    _checkRole();
+  }
+
+  Future<void> _checkRole() async {
+    final isOwner = await AuthService.isOwner();
+    setState(() {
+      _isOwner = isOwner;
+      _isLoading = false; // ✅ Loading selesai
+      // ✅ Reset index jika cashier (karena menu lebih sedikit)
+      if (!isOwner && currentIndex >= 3) {
+        currentIndex = 0;
+      }
+    });
+  }
+
+  // 👤 OWNER - 5 Menu (Full Access)
+  final List<Widget> _ownerPages = [
     const Homepage(),
     const ProductCategoryPage(),
     const TransactionPage(), // POS
@@ -25,8 +47,15 @@ class _BottomBarState extends State<BottomBar> {
     const MorePage(),
   ];
 
-  // Data icon: [outline, filled, label]
-  final List<Map<String, dynamic>> iconData = [
+  // 🧑‍💼 CASHIER - 3 Menu (Limited Access)
+  final List<Widget> _cashierPages = [
+    const Homepage(),
+    const TransactionPage(), // POS (index 1 untuk cashier)
+    const MorePage(),
+  ];
+
+  // 👤 OWNER - Icon Data (5 menu)
+  final List<Map<String, dynamic>> _ownerIconData = [
     {
       'outline': Icons.home_outlined,
       'filled': Icons.home_rounded,
@@ -54,66 +83,46 @@ class _BottomBarState extends State<BottomBar> {
     },
   ];
 
-
-  List<Widget> get icon {
-    return List.generate(iconData.length, (index) {
-      final isActive = currentIndex == index;
-      final isPOS = index == 2; // POS di tengah
-
-      // Kalau POS, bikin khusus (besar, fluid)
-      if (isPOS) {
-        return Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: primaryGreenColor,
-            boxShadow: [
-              BoxShadow(
-                color: primaryGreenColor.withOpacity(0.3),
-                blurRadius: 12,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: Icon(
-            isActive ? iconData[index]['filled'] : iconData[index]['outline'],
-            color: Colors.white,
-            size: 32,
-          ),
-        );
-      }
-
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            isActive ? iconData[index]['filled'] : iconData[index]['outline'],
-            color: isActive ? primaryGreenColor : Colors.grey,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            iconData[index]['label'],
-            style: TextStyle(
-              fontSize: 10,
-              color: isActive ? primaryGreenColor : Colors.grey,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-        ],
-      );
-    });
-  }
+  // 🧑‍💼 CASHIER - Icon Data (3 menu)
+  final List<Map<String, dynamic>> _cashierIconData = [
+    {
+      'outline': Icons.home_outlined,
+      'filled': Icons.home_rounded,
+      'label': 'Beranda'
+    },
+    {
+      'outline': Icons.point_of_sale_outlined,
+      'filled': Icons.point_of_sale_rounded,
+      'label': 'POS'
+    },
+    {
+      'outline': Icons.more_horiz_outlined,
+      'filled': Icons.more_horiz_rounded,
+      'label': 'Lainnya'
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Tampilkan loading saat cek role
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // ✅ Tentukan data berdasarkan role
+    final pages = _isOwner ? _ownerPages : _cashierPages;
+    final iconData = _isOwner ? _ownerIconData : _cashierIconData;
+    final posIndex = _isOwner ? 2 : 1; // POS index berbeda untuk owner & cashier
+
     return Scaffold(
       extendBody: true,
-      body: body[currentIndex],
+      body: pages[currentIndex],
       bottomNavigationBar: Stack(
-        clipBehavior: Clip.none, // Biar POS bisa keluar dari container
+        clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
           // Bottom bar background
@@ -133,11 +142,11 @@ class _BottomBarState extends State<BottomBar> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(iconData.length, (index) {
                 final isActive = currentIndex == index;
-                final isPOS = index == 2;
+                final isPOS = index == posIndex;
 
-                // POS: bikin placeholder kosong
+                // POS: bikin placeholder kosong (floating button)
                 if (isPOS) {
-                  return const SizedBox(width: 60); // Placeholder
+                  return const SizedBox(width: 60);
                 }
 
                 // Menu lainnya
@@ -160,7 +169,8 @@ class _BottomBarState extends State<BottomBar> {
                         style: TextStyle(
                           fontSize: 10,
                           color: isActive ? primaryGreenColor : Colors.grey,
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -172,9 +182,9 @@ class _BottomBarState extends State<BottomBar> {
 
           // POS button (floating di atas)
           Positioned(
-            bottom: 30, // Seberapa tinggi mau naik (adjust sesuai selera)
+            bottom: 30,
             child: GestureDetector(
-              onTap: () => onTap(2),
+              onTap: () => onTap(posIndex), // ✅ Dynamic POS index
               child: Container(
                 width: 65,
                 height: 65,
@@ -190,11 +200,10 @@ class _BottomBarState extends State<BottomBar> {
                   ],
                 ),
                 child: Icon(
-                  iconData[2]['filled'],
+                  iconData[posIndex]['filled'],
                   color: Colors.white,
                   size: 32,
                 ),
-
               ),
             ),
           ),
@@ -203,7 +212,7 @@ class _BottomBarState extends State<BottomBar> {
     );
   }
 
-  void onTap(index) {
+  void onTap(int index) {
     setState(() {
       currentIndex = index;
     });
