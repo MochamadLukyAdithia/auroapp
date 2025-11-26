@@ -1,50 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/route/route.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
-
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../../blocs/payment_method/payment_method_cubit.dart';
+import '../../../../../../blocs/payment_method/payment_method_state.dart';
+import '../../../../../../data/models/payment_method_model.dart';
+import '../../../../../widgets/floating_message.dart';
 
-class PaymentMethodPage extends StatelessWidget {
+class PaymentMethodPage extends StatefulWidget {
   const PaymentMethodPage({super.key});
+
+  @override
+  State<PaymentMethodPage> createState() => _PaymentMethodPageState();
+}
+
+class _PaymentMethodPageState extends State<PaymentMethodPage> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<PaymentMethodCubit>().loadPaymentMethods();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: const CustomAppBar(title: 'Metode Pembayaran'),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const PaymentSectionHeader(title: 'PEMBAYARAN TUNAI'),
-          const SizedBox(height: 16),
-          PaymentMethodItem(
-            title: 'Tunai',
-            isEnabled: true,
-            onChanged: (value) {
-              // TODO: Handle toggle with BLoC
-            },
-          ),
-          const SizedBox(height: 12),
-          PaymentMethodItem(
-            title: 'Qris',
-            isEnabled: true,
-            onChanged: (value) {
-              // TODO: Handle toggle with BLoC
-            },
-          ),
-          const SizedBox(height: 32),
-          const PaymentSectionHeader(title: 'PEMBAYARAN NON TUNAI'),
-          const SizedBox(height: 16),
-          PaymentMethodItem(
-            title: 'Bank Transfer',
-            isEnabled: true,
-            onChanged: (value) {
-              // TODO: Handle toggle with BLoC
-            },
-          ),
-          const SizedBox(height: 56),
-          const AddPaymentMethodButton()
-        ],
+      body: BlocConsumer<PaymentMethodCubit, PaymentMethodState>(
+        listener: (context, state) {
+          if (state is PaymentMethodOperationSuccess) {
+            FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+          } else if (state is PaymentMethodError) {
+            FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+          }
+        },
+        builder: (context, state) {
+          if (state is PaymentMethodLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state is PaymentMethodLoaded) {
+            return ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                // QRIS Section
+                if (state.qrisMethods.isNotEmpty) ...[
+                  const PaymentSectionHeader(title: 'QRIS'),
+                  const SizedBox(height: 12),
+                  ...state.qrisMethods.map((method) => PaymentMethodItem(
+                    paymentMethod: method,
+                    onChanged: (value) {
+                      context.read<PaymentMethodCubit>().togglePaymentMethod(method.id);
+                    },
+                  )),
+                  const SizedBox(height: 32),
+                ],
+
+                // E-Wallet Section
+                if (state.ewalletMethods.isNotEmpty) ...[
+                  const PaymentSectionHeader(title: 'E-WALLET'),
+                  const SizedBox(height: 12),
+                  ...state.ewalletMethods.map((method) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: PaymentMethodItem(
+                      paymentMethod: method,
+                      onChanged: (value) {
+                        context.read<PaymentMethodCubit>().togglePaymentMethod(method.id);
+                      },
+                    ),
+                  )),
+                  const SizedBox(height: 32),
+                ],
+
+                // Bank Transfer Section
+                if (state.bankMethods.isNotEmpty) ...[
+                  const PaymentSectionHeader(title: 'TRANSFER BANK'),
+                  const SizedBox(height: 12),
+                  ...state.bankMethods.map((method) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: PaymentMethodItem(
+                      paymentMethod: method,
+                      onChanged: (value) {
+                        context.read<PaymentMethodCubit>().togglePaymentMethod(method.id);
+                      },
+                    ),
+                  )),
+                  const SizedBox(height: 32),
+                ],
+
+                const SizedBox(height: 24),
+              ],
+            );
+          }
+
+          return const Center(child: Text('Tidak ada metode pembayaran'));
+        },
       ),
     );
   }
@@ -74,14 +125,12 @@ class PaymentSectionHeader extends StatelessWidget {
 }
 
 class PaymentMethodItem extends StatelessWidget {
-  final String title;
-  final bool isEnabled;
+  final PaymentMethod paymentMethod;
   final ValueChanged<bool> onChanged;
 
   const PaymentMethodItem({
     super.key,
-    required this.title,
-    required this.isEnabled,
+    required this.paymentMethod,
     required this.onChanged,
   });
 
@@ -92,24 +141,56 @@ class PaymentMethodItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-              fontFamily: fontType,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  paymentMethod.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                    fontFamily: fontType,
+                  ),
+                ),
+                // if (paymentMethod.accountNumber != null &&
+                //     paymentMethod.accountNumber!.isNotEmpty) ...[
+                //   const SizedBox(height: 4),
+                //   Text(
+                //     paymentMethod.accountNumber!,
+                //     style: TextStyle(
+                //       fontSize: 12,
+                //       color: Colors.grey.shade600,
+                //       fontFamily: fontType,
+                //     ),
+                //   ),
+                // ],
+                // if (paymentMethod.accountName != null &&
+                //     paymentMethod.accountName!.isNotEmpty) ...[
+                //   const SizedBox(height: 2),
+                //   Text(
+                //     paymentMethod.accountName!,
+                //     style: TextStyle(
+                //       fontSize: 12,
+                //       color: Colors.grey.shade600,
+                //       fontFamily: fontType,
+                //     ),
+                //   ),
+                // ],
+              ],
             ),
           ),
           Switch(
-            value: isEnabled,
+            value: paymentMethod.isEnabled,
             onChanged: onChanged,
             activeColor: Colors.white,
-            activeTrackColor: primaryGreenColor, // Ganti dengan warna primaryGreenColor mu
+            activeTrackColor: primaryGreenColor,
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: Colors.grey.shade300,
           ),
@@ -119,32 +200,3 @@ class PaymentMethodItem extends StatelessWidget {
   }
 }
 
-class AddPaymentMethodButton extends StatelessWidget {
-  const AddPaymentMethodButton({super.key});
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.pushNamed(context, AppRoutes.addPaymentMethod);
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryGreenColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        child: const Text(
-          'Tambah Rekening',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            fontFamily: fontType,
-          ),
-        ),
-      ),
-    );
-  }
-}
