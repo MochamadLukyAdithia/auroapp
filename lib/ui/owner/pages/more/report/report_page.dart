@@ -1,19 +1,48 @@
 import 'package:flutter/material.dart';
+import '../../../../../core/utils/auth_service.dart';
 import '../../../../../route/route.dart';
 import '../../../../widgets/custom_app_bar.dart';
 
-
-
-class ReportPage extends StatelessWidget {
+class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
   @override
+  State<ReportPage> createState() => _ReportPageState();
+}
+
+class _ReportPageState extends State<ReportPage> {
+  bool _isOwner = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRole();
+  }
+
+  Future<void> _checkRole() async {
+    final isOwner = await AuthService.isOwner();
+    setState(() {
+      _isOwner = isOwner;
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        appBar: CustomAppBar(title: 'Laporan'),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: const CustomAppBar(title: 'Laporan'),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          // ✅ Laporan Transaksi Penjualan - SEMUA ROLE bisa akses
           MenuTile(
             icon: Icons.group,
             title: 'Laporan Transaksi Penjualan',
@@ -23,23 +52,26 @@ class ReportPage extends StatelessWidget {
           ),
           const Divider(height: 1),
 
-          MenuTile(
-            icon: Icons.business,
-            title: 'Laporan Pengeluaran',
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.expenditureReport);
-            },
-          ),
-          const Divider(height: 1),
+          // ✅ Menu di bawah ini HANYA untuk OWNER
+          if (_isOwner) ...[
+            MenuTile(
+              icon: Icons.business,
+              title: 'Laporan Pengeluaran',
+              onTap: () {
+                Navigator.pushNamed(context, AppRoutes.expenditureReport);
+              },
+            ),
+            const Divider(height: 1),
 
-          MenuTile(
-            icon: Icons.shopping_cart,
-            title: 'Laporan Arus Kas',
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.flowReport);
-            },
-          ),
-          const Divider(height: 1),
+            MenuTile(
+              icon: Icons.shopping_cart,
+              title: 'Laporan Arus Kas',
+              onTap: () {
+                Navigator.pushNamed(context, AppRoutes.flowReport);
+              },
+            ),
+            const Divider(height: 1),
+          ],
         ],
       ),
     );
