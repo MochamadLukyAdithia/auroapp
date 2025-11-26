@@ -1,6 +1,15 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/bank.dart';
+import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/cash.dart';
+import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/e-wallet.dart';
+import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
+import 'package:pos_mobile/ui/widgets/floating_message.dart';
+import '../../../../../blocs/history_stock/stock_bloc.dart';
+import '../../../../../blocs/transaction/transaction_cubit.dart';
+import '../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../route/route.dart';
 
@@ -68,28 +77,66 @@ class PaymentOptionList extends StatelessWidget {
   }
 
   void _navigateToPayment(BuildContext context, String label) {
+    final transactionCubit = context.read<TransactionCubit>();
+
     switch (label) {
       case 'Tunai':
-        Navigator.pushNamed(context, AppRoutes.cashPayment);
+      // Set payment method dulu
+        transactionCubit.setPaymentMethod(PaymentMethod.cash);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: transactionCubit,
+              child: const CashPayment(),
+            ),
+          ),
+        );
         break;
+
       case 'QRIS':
-        _showQrisPaymentDialog(context);
+      // Set payment method dulu sebelum dialog
+        transactionCubit.setPaymentMethod(PaymentMethod.qris);
+        _showDigitalPaymentDialog(context, PaymentMethod.qris);
         break;
+
       case 'Bank Transfer':
-        Navigator.pushNamed(context, AppRoutes.bankPayment);
+      // Ke halaman pilih bank dulu
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: transactionCubit,
+              child: const BankTransferPayment(),
+            ),
+          ),
+        );
         break;
+
       case 'E-Wallet':
-        Navigator.pushNamed(context, AppRoutes.ewalletPayment);
+      // Ke halaman pilih e-wallet dulu
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: transactionCubit,
+              child: const EwalletPayment(),
+            ),
+          ),
+        );
         break;
     }
   }
 
-  void _showQrisPaymentDialog(BuildContext context) {
+  void _showDigitalPaymentDialog(BuildContext context, PaymentMethod method) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.3),
-      builder: (context) => const QrisPaymentDialog(),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<TransactionCubit>(),
+        child: DigitalPaymentDialog(paymentMethod: method),
+      ),
     );
   }
 }
@@ -167,6 +214,9 @@ class PaymentNoteField extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           maxLines: 3,
+          onChanged: (value) {
+            context.read<TransactionCubit>().setNotes(value);
+          },
           decoration: InputDecoration(
             hintText: 'Contoh: Pembelian Produk',
             hintStyle: const TextStyle(color: Colors.grey),
@@ -190,137 +240,287 @@ class PaymentNoteField extends StatelessWidget {
 }
 
 // Dialog QRIS dengan Blur Background
-class QrisPaymentDialog extends StatelessWidget {
-  const QrisPaymentDialog({super.key});
+class DigitalPaymentDialog extends StatelessWidget {
+  final PaymentMethod paymentMethod;
+
+  const DigitalPaymentDialog({
+    super.key,
+    required this.paymentMethod,
+  });
+
+  IconData get _icon {
+    switch (paymentMethod) {
+      case PaymentMethod.qris:
+        return Icons.qr_code_scanner;
+      case PaymentMethod.bankTransfer:
+        return Icons.account_balance;
+      case PaymentMethod.ewallet:
+        return Icons.account_balance_wallet;
+      default:
+        return Icons.payment;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon Warning
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFA726),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.warning_rounded,
-                  size: 32,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 16),
+    return BlocBuilder<TransactionCubit, TransactionState>(
+      builder: (context, state) {
+        final totalTagihan = state.finalTotal;
 
-              // Title
-              const Text(
-                'Warning',
-                style: TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
-                textAlign: TextAlign.center,
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 8),
-
-              // Message
-              const Text(
-                'This is the description of the presenter dialog box',
-                style: TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 13,
-                  color: Colors.grey,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-
-              // Buttons
-              Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Button Dismiss
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: const Color(0xFFE57373),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Pembayaran dibatalkan'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Dismiss',
-                        style: TextStyle(
-                          fontFamily: fontType,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  // Icon
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: const BoxDecoration(
+                      color: primaryGreenColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _icon,
+                      size: 32,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(height: 16),
 
-                  // Button OK
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: primaryGreenColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.transactionSuccess);
-
-                      },
-                      child: const Text(
-                        'OK',
-                        style: TextStyle(
-                          fontFamily: fontType,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  // Title
+                  Text(
+                    'Konfirmasi Pembayaran ${paymentMethod.displayName}',
+                    style: const TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Total
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Total Pembayaran',
+                          style: TextStyle(
+                            fontFamily: fontType,
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rp ${totalTagihan}',
+                          style: const TextStyle(
+                            fontFamily: fontType,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: primaryGreenColor,
+                          ),
+                        ),
+                        if (state.discount > 0 || state.otherCosts > 0) ...[
+                          const SizedBox(height: 8),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Subtotal',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                              Text(
+                                'Rp ${state.subtotal}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          if (state.discount > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Diskon',
+                                  style: TextStyle(fontSize: 12, color: Colors.red),
+                                ),
+                                Text(
+                                  '- Rp ${state.discount}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (state.otherCosts > 0) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Biaya Lain',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  '+ Rp ${state.otherCosts}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Message
+                  Text(
+                    'Apakah pembayaran via ${paymentMethod.displayName} sudah berhasil?',
+                    style: const TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 13,
+                      color: Colors.grey,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: const Color(0xFFE57373),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            FloatingMessage.show(
+                              context,
+                              message: 'Pembayaran dibatalkan',
+                              textOnly: true,
+                              backgroundColor: Colors.red,
+                            );
+                          },
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(
+                              fontFamily: fontType,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: primaryGreenColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () async {
+                            final cubit = context.read<TransactionCubit>();
+                            final state = cubit.state;
+
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => const Center(
+                                child: CircularProgressIndicator(color: primaryGreenColor),
+                              ),
+                            );
+
+                            bool hasStockIssue = false;
+                            String errorMessage = '';
+
+                            for (var product in state.selectedItems) {
+                              final qty = state.getQuantity(product.id.toString());
+                              final stock = product.productStock;
+
+                              if (qty > stock) {
+                                hasStockIssue = true;
+                                errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
+                                    'Tersedia: $stock, Dipilih: $qty';
+                                break;
+                              }
+                            }
+                            if (context.mounted) Navigator.of(context).pop();
+                            if (hasStockIssue) {
+                              Navigator.of(context).pop();
+                              FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                              return;
+                            }
+                            cubit.completeDigitalPayment(paymentMethod);
+                            Navigator.of(context).pop();
+                            final stockBloc = context.read<StockBloc>();
+
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MultiBlocProvider(
+                                  providers: [
+                                    BlocProvider.value(value: cubit),
+                                    BlocProvider.value(value: stockBloc),
+                                  ],
+                                  child: const TransactionSuccess(),
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Berhasil',
+                            style: TextStyle(
+                              fontFamily: fontType,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
