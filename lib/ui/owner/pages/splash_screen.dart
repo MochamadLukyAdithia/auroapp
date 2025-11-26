@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pos_mobile/route/route.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/theme/theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -24,11 +27,49 @@ class _SplashScreenState extends State<SplashScreen> {
     });
   }
 
-  void _skipToLogin() {
+  void _skipToLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_onboarding', true);
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
-  void _startApp() {
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTimeAndLogin();
+  }
+
+  Future<void> _checkFirstTimeAndLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+
+    if (!hasSeenOnboarding) {
+      return; // Tetap di onboarding
+    }
+
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+
+    // 🆕 Validasi lebih ketat
+    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+    final currentUserData = prefs.getString('current_user_data');
+    final accessToken = prefs.getString('access_token');
+
+    // Cek apakah benar-benar ada session yang valid
+    if (isLoggedIn && currentUserData != null && accessToken != null) {
+      Navigator.pushReplacementNamed(context, AppRoutes.homepage);
+    } else {
+      await prefs.clear();
+
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
+  }
+
+  void _startApp() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_onboarding', true);
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
@@ -130,54 +171,15 @@ class SplashPage1 extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     final logoWidth = size.width * 0.8;
 
-    return Container(
-      color: Colors.white,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/icon/auropay_logo.png',
-              width: logoWidth,
-              fit: BoxFit.contain,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============ Splash Page 2 ============
-class SplashPage2 extends StatelessWidget {
-  const SplashPage2({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(32.0),
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 40),
-          const Text(
-            'SELAMAT DATANG DI AURO PAY',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Selamat datang di Auro Pay!\nSetiap usaha adalah dimulai dengan satu langkah kecil, mari yakin dan tingkah',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+          Image.asset(
+            'assets/icon/auropay_logo.png',
+            width: logoWidth,
+            fit: BoxFit.contain,
           ),
         ],
       ),
@@ -185,6 +187,69 @@ class SplashPage2 extends StatelessWidget {
   }
 }
 
+class SplashPage2 extends StatelessWidget {
+  const SplashPage2({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            primaryBlueColor,
+            primaryGreenColor,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Judul
+              RichText(
+                textAlign: TextAlign.center,
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: fontType,
+                    color: Colors.white,
+                    height: 1.2,
+                  ),
+                  children: [
+                    TextSpan(text: 'SELAMAT DATANG\nDI '),
+                    TextSpan(
+                      text: 'AURO PAY',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Deskripsi
+              Text(
+                'Selamat datang para UMKM!\nSetiap usaha selalu dimulai dengan satu\nlangkah kecil, anda sudah satu langkah lebih maju.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.95),
+                  fontFamily: fontType,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 // ============ Splash Page 3 ============
 class SplashPage3 extends StatelessWidget {
   const SplashPage3({super.key});
