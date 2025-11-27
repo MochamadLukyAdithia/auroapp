@@ -103,8 +103,8 @@ class AppRoutes {
   static const String addCashier = '/more/setting/cashier/add_cashier';
   static const String paymentMethod = '/more/setting/payment_method';
   static const String addPaymentMethod = '/more/setting/payment_method/add_payment_method';
-  static const String shop = '/more/setting/shop';
-  static const String updateShop = '/more/setting/shop/update_shop';
+  static const String shop = '/more/setting/company';
+  static const String updateShop = '/more/setting/company/update_shop';
   static const String ownerProfile = '/more/setting/owner_profile';
   static const String updateOwnerProfile = '/more/setting/owner_profile/update_owner_profile';
   static const String cashierProfile = '/more/cashier_profile';
@@ -245,10 +245,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const UpdateProfileCashier());
 
       case shop:
-        return MaterialPageRoute(builder: (_) => const ShopPage());
+        return MaterialPageRoute(builder: (_) => const CompanyPage());
 
       case updateShop:
-        return MaterialPageRoute(builder: (_) => const ShopPageUpdate());
+        return MaterialPageRoute(builder: (_) => const CompanyPageUpdate());
 
       case salesReport:
         return MaterialPageRoute(builder: (_) => const SalesReportPage());
