@@ -1,36 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pos_mobile/data/models/shop.dart';
-import '../../../../../../blocs/shop/shop_cubit.dart';
+import '../../../../../../blocs/company/company_cubit.dart';
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../../data/models/company_model.dart';
 import '../../../../../widgets/custom_app_bar.dart';
 import 'dart:io';
 import '../../../../../widgets/floating_message.dart';
 import '../../../../../widgets/image_picker.dart';
 
-class ShopPageUpdate extends StatefulWidget {
-  final Shop? shop;
+class CompanyPageUpdate extends StatefulWidget {
+  final Company? company;
 
-  const ShopPageUpdate({super.key, this.shop});
+  const CompanyPageUpdate({super.key, this.company});
 
   @override
-  State<ShopPageUpdate> createState() => _ShopPageUpdateState();
+  State<CompanyPageUpdate> createState() => _CompanyPageUpdateState();
 }
 
-class _ShopPageUpdateState extends State<ShopPageUpdate> {
+class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
   late TextEditingController _nameController;
   late TextEditingController _addressController;
   late TextEditingController _phoneController;
-  String? _photoUrl;
-  File? _photoFile;
+  String? _logoUrl;
+  File? _logoFile;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.shop?.shopName ?? '');
-    _addressController = TextEditingController(text: widget.shop?.shopAddress ?? '');
-    _phoneController = TextEditingController(text: widget.shop?.shopPhone ?? '');
-    _photoUrl = widget.shop?.shopPhoto;
+    _nameController = TextEditingController(text: widget.company?.name ?? '');
+    _addressController = TextEditingController(text: widget.company?.address ?? '');
+    _phoneController = TextEditingController(text: widget.company?.phone ?? '');
+    _logoUrl = widget.company?.logo;
   }
 
   @override
@@ -41,7 +42,7 @@ class _ShopPageUpdateState extends State<ShopPageUpdate> {
     super.dispose();
   }
 
-  void _saveShop() {
+  void _saveCompany() {
     // Validasi
     if (_nameController.text.trim().isEmpty) {
       FloatingMessage.show(
@@ -73,91 +74,104 @@ class _ShopPageUpdateState extends State<ShopPageUpdate> {
       return;
     }
 
-    // TODO: Jika ada _photoFile, upload dulu ke server
-    // Untuk sementara gunakan path lokal atau URL yang sudah ada
-    String finalPhotoUrl = _photoUrl ?? '';
-    if (_photoFile != null) {
-      // Sementara gunakan path lokal
-      // Nanti diganti dengan URL hasil upload
-      finalPhotoUrl = _photoFile!.path;
-    }
-
-    final shop = Shop(
-      id: widget.shop?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      shopName: _nameController.text.trim(),
-      shopPhoto: finalPhotoUrl,
-      shopAddress: _addressController.text.trim(),
-      shopPhone: _phoneController.text.trim(),
+    // Panggil API update company
+    context.read<CompanyCubit>().saveCompany(
+      name: _nameController.text.trim(),
+      address: _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      logo: _logoFile, // Kirim file jika ada
     );
-
-    context.read<ShopCubit>().saveShop(shop);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomAppBar(title: 'Update Profil Toko'),
-      body: BlocListener<ShopCubit, ShopState>(
+      body: BlocConsumer<CompanyCubit, CompanyState>(
         listener: (context, state) {
-          if (state is ShopSaved) {
+          if (state is CompanyLoading) {
+            setState(() => _isLoading = true);
+          } else {
+            setState(() => _isLoading = false);
+          }
+
+          if (state is CompanySaved) {
             FloatingMessage.show(
               context,
-              message: 'Profile toko berhasil disimpan',
+              message: 'Profil toko berhasil disimpan',
               textOnly: true,
               backgroundColor: primaryGreenColor,
             );
             Navigator.pop(context);
           }
-          if (state is ShopError) {
+
+          if (state is CompanyError) {
             FloatingMessage.show(
               context,
-              message: 'Profile toko gagal diperbarui',
+              message: state.message,
               textOnly: true,
               backgroundColor: Colors.red,
             );
           }
         },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+        builder: (context, state) {
+          return Stack(
             children: [
-              ShopPhotoSection(
-                photoUrl: _photoUrl,
-                photoFile: _photoFile,
-                onImagePicked: (file) {
-                  setState(() {
-                    _photoFile = file;
-                  });
-                },
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    CompanyLogoSection(
+                      logoUrl: _logoUrl,
+                      logoFile: _logoFile,
+                      onImagePicked: (file) {
+                        setState(() {
+                          _logoFile = file;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    CompanyNameField(controller: _nameController),
+                    const SizedBox(height: 16),
+                    CompanyAddress(controller: _addressController),
+                    const SizedBox(height: 16),
+                    CompanyPhoneNumber(controller: _phoneController),
+                    const SizedBox(height: 16),
+                    SaveButton(
+                      onPressed: _isLoading ? null : _saveCompany,
+                      isLoading: _isLoading,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              ShopNameField(controller: _nameController),
-              const SizedBox(height: 16),
-              ShopAddress(controller: _addressController),
-              const SizedBox(height: 16),
-              ShopPhoneNumber(controller: _phoneController),
-              const SizedBox(height: 16),
-              SaveButton(onPressed: _saveShop),
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.3),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: primaryGreenColor,
+                    ),
+                  ),
+                ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-
-// foto toko
-class ShopPhotoSection extends StatelessWidget {
-  final String? photoUrl;
-  final File? photoFile;
+// Logo toko
+class CompanyLogoSection extends StatelessWidget {
+  final String? logoUrl;
+  final File? logoFile;
   final Function(File) onImagePicked;
 
-  const ShopPhotoSection({
+  const CompanyLogoSection({
     super.key,
     required this.onImagePicked,
-    this.photoUrl,
-    this.photoFile,
+    this.logoUrl,
+    this.logoFile,
   });
 
   @override
@@ -175,8 +189,8 @@ class ShopPhotoSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         ImagePickerWidget(
-          imageUrl: photoUrl,
-          imageFile: photoFile,
+          imageUrl: logoUrl,
+          imageFile: logoFile,
           onImagePicked: onImagePicked,
           width: 80,
           height: 80,
@@ -184,7 +198,7 @@ class ShopPhotoSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Format gambar .jpg .jpeg .png dan Ukuran file 5MB (Gunakan ukuran minimum 500 x 500 pxl).',
+          'Format gambar .jpg .jpeg .png dan Ukuran file 3MB (Gunakan ukuran minimum 500 x 500 pxl).',
           style: TextStyle(
             fontSize: 11,
             color: Colors.grey[600],
@@ -197,11 +211,11 @@ class ShopPhotoSection extends StatelessWidget {
   }
 }
 
-// nama toko
-class ShopNameField extends StatelessWidget {
+// Nama toko
+class CompanyNameField extends StatelessWidget {
   final TextEditingController controller;
 
-  const ShopNameField({super.key, required this.controller});
+  const CompanyNameField({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +230,7 @@ class ShopNameField extends StatelessWidget {
         TextFormField(
           controller: controller,
           decoration: InputDecoration(
-            hintText: 'Contoh: Toko 1',
+            hintText: 'Contoh: Toko Sumber Rejeki',
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14, fontFamily: fontType),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -241,11 +255,11 @@ class ShopNameField extends StatelessWidget {
   }
 }
 
-// alamat toko
-class ShopAddress extends StatelessWidget {
+// Alamat toko
+class CompanyAddress extends StatelessWidget {
   final TextEditingController controller;
 
-  const ShopAddress({super.key, required this.controller});
+  const CompanyAddress({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -303,11 +317,11 @@ class ShopAddress extends StatelessWidget {
   }
 }
 
-// nomor telpon toko
-class ShopPhoneNumber extends StatelessWidget {
+// Nomor telpon toko
+class CompanyPhoneNumber extends StatelessWidget {
   final TextEditingController controller;
 
-  const ShopPhoneNumber({super.key, required this.controller});
+  const CompanyPhoneNumber({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -365,9 +379,14 @@ class ShopPhoneNumber extends StatelessWidget {
 }
 
 class SaveButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
-  const SaveButton({super.key, required this.onPressed});
+  const SaveButton({
+    super.key,
+    required this.onPressed,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -381,8 +400,18 @@ class SaveButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          disabledBackgroundColor: Colors.grey[400],
         ),
-        child: const Text(
+        child: isLoading
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
+            : const Text(
           'Simpan',
           style: TextStyle(
             fontSize: 16,

@@ -1,40 +1,70 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/core/theme/theme.dart';
-import 'package:pos_mobile/ui/owner/pages/more/settings/shop/shop_page_update.dart';
+import 'package:pos_mobile/ui/owner/pages/more/settings/shop/company_page_update.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
-import '../../../../../../blocs/shop/shop_cubit.dart';
-import '../../../../../../data/models/shop.dart';
+import '../../../../../../blocs/company/company_cubit.dart';
+import '../../../../../../data/models/company_model.dart';
 
-class ShopPage extends StatelessWidget {
-  const ShopPage({super.key});
+
+class CompanyPage extends StatelessWidget {
+  const CompanyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: const CustomAppBar(title: 'Profil Toko'),
-      body: BlocBuilder<ShopCubit, ShopState>(
+      body: BlocBuilder<CompanyCubit, CompanyState>(
         builder: (context, state) {
-          if (state is ShopLoading) {
+          if (state is CompanyLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is ShopEmpty) {
+          if (state is CompanyEmpty) {
             return _buildEmptyState(context);
           }
 
-          if (state is ShopLoaded || state is ShopSaved) {
-            final shop = state is ShopLoaded
-                ? state.shop
-                : (state as ShopSaved).shop;
-            return _buildContent(context, shop);
+          if (state is CompanyLoaded || state is CompanySaved) {
+            final company = state is CompanyLoaded
+                ? state.company
+                : (state as CompanySaved).company;
+            return _buildContent(context, company);
           }
 
-          if (state is ShopError) {
-            return Center(child: Text('Error: ${state.message}'));
+          if (state is CompanyError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 60,
+                    color: Colors.red[300],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error: ${state.message}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<CompanyCubit>().loadCompany();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryGreenColor,
+                    ),
+                    child: const Text(
+                      'Coba Lagi',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
           return const SizedBox();
@@ -104,8 +134,8 @@ class ShopPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => BlocProvider.value(
-                        value: context.read<ShopCubit>(),
-                        child: const ShopPageUpdate(),
+                        value: context.read<CompanyCubit>(),
+                        child: const CompanyPageUpdate(),
                       ),
                     ),
                   );
@@ -141,7 +171,7 @@ class ShopPage extends StatelessWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, Shop shop) {
+  Widget _buildContent(BuildContext context, Company company) {
     return Column(
       children: [
         Expanded(
@@ -190,7 +220,7 @@ class ShopPage extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 60),
                       child: Center(
-                        child: ShopLogo(photoUrl: shop.shopPhoto),
+                        child: CompanyLogo(logoUrl: company.logo ?? ''),
                       ),
                     ),
                   ],
@@ -199,7 +229,7 @@ class ShopPage extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    shop.shopName,
+                    company.name,
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -209,25 +239,25 @@ class ShopPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                ShopInfoCard(shop: shop),
+                CompanyInfoCard(company: company),
                 const SizedBox(height: 100),
               ],
             ),
           ),
         ),
-        EditButton(shop: shop),
+        EditButton(company: company),
       ],
     );
   }
 }
 
-class ShopLogo extends StatelessWidget {
-  final String photoUrl;
+class CompanyLogo extends StatelessWidget {
+  final String? logoUrl;
 
-  const ShopLogo({super.key, required this.photoUrl});
+  const CompanyLogo({super.key, required this.logoUrl});
 
-  bool _isLocalFile(String path) {
-    return path.startsWith('/') || path.startsWith('file://');
+  bool _isLocalFile(String? path) {
+    return path!.startsWith('/') || path!.startsWith('file://');
   }
 
   @override
@@ -248,10 +278,10 @@ class ShopLogo extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: photoUrl.isNotEmpty
-            ? _isLocalFile(photoUrl)
+        child: logoUrl!.isNotEmpty
+            ? _isLocalFile(logoUrl)
             ? Image.file(
-          File(photoUrl),
+          File(logoUrl!),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
@@ -265,7 +295,7 @@ class ShopLogo extends StatelessWidget {
           },
         )
             : Image.network(
-          photoUrl,
+          logoUrl!,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return Container(
@@ -303,10 +333,10 @@ class ShopLogo extends StatelessWidget {
   }
 }
 
-class ShopInfoCard extends StatelessWidget {
-  final Shop shop;
+class CompanyInfoCard extends StatelessWidget {
+  final Company company;
 
-  const ShopInfoCard({super.key, required this.shop});
+  const CompanyInfoCard({super.key, required this.company});
 
   @override
   Widget build(BuildContext context) {
@@ -327,28 +357,28 @@ class ShopInfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ShopInfoItem(
+          CompanyInfoItem(
             icon: Icons.store_rounded,
             label: 'Nama Toko',
-            value: shop.shopName,
+            value: company.name,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Colors.grey[200], height: 1),
           ),
-          ShopInfoItem(
+          CompanyInfoItem(
             icon: Icons.location_on_rounded,
             label: 'Alamat Toko',
-            value: shop.shopAddress,
+            value: company.address,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Colors.grey[200], height: 1),
           ),
-          ShopInfoItem(
+          CompanyInfoItem(
             icon: Icons.phone_rounded,
             label: 'Nomor Telephone Toko',
-            value: shop.shopPhone,
+            value: company.phone,
           ),
         ],
       ),
@@ -356,12 +386,12 @@ class ShopInfoCard extends StatelessWidget {
   }
 }
 
-class ShopInfoItem extends StatelessWidget {
+class CompanyInfoItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
 
-  const ShopInfoItem({
+  const CompanyInfoItem({
     super.key,
     required this.icon,
     required this.label,
@@ -416,15 +446,16 @@ class ShopInfoItem extends StatelessWidget {
 }
 
 class EditButton extends StatelessWidget {
-  final Shop shop;
+  final Company company;
 
-  const EditButton({super.key, required this.shop});
+  const EditButton({super.key, required this.company});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -458,8 +489,8 @@ class EditButton extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => BlocProvider.value(
-                      value: context.read<ShopCubit>(),
-                      child: ShopPageUpdate(shop: shop),
+                      value: context.read<CompanyCubit>(),
+                      child: CompanyPageUpdate(company: company),
                     ),
                   ),
                 );
