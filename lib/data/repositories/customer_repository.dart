@@ -213,7 +213,7 @@ class CustomerRepository {
         final errors = json['data'] as Map<String, dynamic>?;
         final errorMessage = errors?.values.first is List
             ? (errors!.values.first as List).first.toString()
-            : meta?['message'] ?? 'Validation failed';
+            : meta?['message'] ?? 'Akun sudah terdaftar';
 
         return ApiResponse.error(
           message: errorMessage,
