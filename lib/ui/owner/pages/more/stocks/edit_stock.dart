@@ -36,6 +36,7 @@ class _EditStockPageState extends State<EditStockPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
+
   }
 
   void _onTabChanged() {
@@ -560,10 +561,21 @@ class _CustomTextField extends StatelessWidget {
 
 
 // ==================== STOCK HISTORY TAB ====================
-class StockHistoryTab extends StatelessWidget {
+class StockHistoryTab extends StatefulWidget {
   final ProductModel product;
-
   const StockHistoryTab({super.key, required this.product});
+
+  @override
+  State<StockHistoryTab> createState() => _StockHistoryTabState();
+}
+
+class _StockHistoryTabState extends State<StockHistoryTab> {
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<StockBloc>().add(LoadStockHistory(productId: widget.product.id!));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -593,7 +605,7 @@ class StockHistoryTab extends StatelessWidget {
                   onPressed: () {
                     context
                         .read<StockBloc>()
-                        .add(LoadStockHistory(productId: product.id!));
+                        .add(LoadStockHistory(productId: widget.product.id!));
                   },
                   child: const Text('Coba Lagi'),
                 ),
