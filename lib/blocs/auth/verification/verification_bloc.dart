@@ -12,10 +12,19 @@ class VerificationBloc extends Bloc<VerificationEvent, VerificationState> {
     required String email,
   })  : _authRepository = authRepository,
         super(VerificationState(userId: userId, email: email)) {
+
+    // Events dari register
     on<VerificationOtpChanged>(_onOtpChanged);
-    on<VerificationSubmitted>(_onSubmitted);
-    on<VerificationResendOtp>(_onResendOtp);
+    on<VerificationSubmitted>(_onVerificationSubmitted);
+    on<VerificationResendOtp>(_onResendOtpFromRegister);
+
+    // Events dari login (resend OTP page)
+    on<ResendOtpEmailChanged>(_onEmailChanged);
+    on<ResendOtpSubmitted>(_onResendOtpSubmitted);
+    on<ResendOtpResetStatus>(_onResetStatus);
   }
+
+  // ========== Handlers untuk Verification dari Register ==========
 
   void _onOtpChanged(
       VerificationOtpChanged event,
@@ -24,7 +33,7 @@ class VerificationBloc extends Bloc<VerificationEvent, VerificationState> {
     emit(state.copyWith(otp: event.otp));
   }
 
-  Future<void> _onSubmitted(
+  Future<void> _onVerificationSubmitted(
       VerificationSubmitted event,
       Emitter<VerificationState> emit,
       ) async {
@@ -60,14 +69,14 @@ class VerificationBloc extends Bloc<VerificationEvent, VerificationState> {
     }
   }
 
-  Future<void> _onResendOtp(
+  Future<void> _onResendOtpFromRegister(
       VerificationResendOtp event,
       Emitter<VerificationState> emit,
       ) async {
     emit(state.copyWith(status: VerificationStatus.loading));
 
     try {
-      final response = await _authRepository.resendOtp(state.userId);
+      final response = await _authRepository.resendOtpFromRegister(state.userId);
 
       if (response.success) {
         emit(state.copyWith(
@@ -86,5 +95,67 @@ class VerificationBloc extends Bloc<VerificationEvent, VerificationState> {
         errorMessage: 'Gagal kirim ulang OTP: ${e.toString()}',
       ));
     }
+  }
+
+  // ========== Handlers untuk Resend OTP dari Login ==========
+
+  void _onEmailChanged(
+      ResendOtpEmailChanged event,
+      Emitter<VerificationState> emit
+      ) {
+    emit(state.copyWith(
+      email: event.email,
+      emailError: null,
+    ));
+  }
+
+  Future<void> _onResendOtpSubmitted(
+      ResendOtpSubmitted event,
+      Emitter<VerificationState> emit
+      ) async {
+    // Validasi email
+    if (state.email.trim().isEmpty) {
+      emit(state.copyWith(emailError: 'Email tidak boleh kosong'));
+      return;
+    }
+
+    if (!_isValidEmail(state.email)) {
+      emit(state.copyWith(emailError: 'Format email tidak valid'));
+      return;
+    }
+
+    emit(state.copyWith(resendStatus: ResendOtpStatus.loading));
+
+    try {
+      final response = await _authRepository.resendOtp(email: state.email.trim());
+
+      if (response.success) {
+        emit(state.copyWith(
+          resendStatus: ResendOtpStatus.success,
+          userId: response.userId,
+        ));
+      } else {
+        emit(state.copyWith(
+          resendStatus: ResendOtpStatus.failure,
+          errorMessage: response.message,
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        resendStatus: ResendOtpStatus.failure,
+        errorMessage: 'Terjadi kesalahan: ${e.toString()}',
+      ));
+    }
+  }
+
+  void _onResetStatus(
+      ResendOtpResetStatus event,
+      Emitter<VerificationState> emit
+      ) {
+    emit(state.copyWith(resendStatus: ResendOtpStatus.initial));
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 }
