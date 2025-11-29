@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../../data/models/customer_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/payment_method_model.dart' as pm;
+import '../../data/models/transaction_model.dart';
 
 enum PaymentMethod {
   none,
@@ -60,6 +61,9 @@ class TransactionState extends Equatable {
   final String notes;
   final Set<String> selectedProductIds;
   final bool isSelectionMode;
+  final bool isLoading;
+  final String? errorMessage;
+  final TransactionModel? completedTransaction;
 
   static const _undefined = Object();
 
@@ -79,26 +83,15 @@ class TransactionState extends Equatable {
     this.notes = '',
     this.selectedProductIds = const {},
     this.isSelectionMode = false,
+    this.isLoading = false,
+    this.errorMessage,
+    this.completedTransaction,
   });
 
   List<ProductModel> get selectedItems =>
       availableProducts.where((p) => (productQuantities[p.id] ?? 0) > 0).toList();
 
   int getQuantity(String productId) => productQuantities[productId] ?? 0;
-
-  // int get totalPayment => availableProducts.fold(0, (sum, product) {
-  //   final qty = productQuantities[product.id] ?? 0;
-  //   final priceAfterDiscount = product.sellingPrice * (1 - product.discount / 100);
-  //   return sum + (priceAfterDiscount * qty).toInt();
-  // });
-  //
-  // int get subtotal => totalPayment;
-  //
-  // int get finalTotal {
-  //   final total = totalPayment - discount + otherCosts;
-  //   return total < 0 ? 0 : total;
-  // }
-
   int get totalBasePrice => availableProducts.fold(0, (sum, product) {
     final qty = productQuantities[product.id] ?? 0;
     return sum + (product.costPrice * qty).toInt();
@@ -210,6 +203,11 @@ class TransactionState extends Equatable {
     String? notes,
     Set<String>? selectedProductIds,
     bool? isSelectionMode,
+    bool? isLoading,
+    String? errorMessage,
+    TransactionModel? completedTransaction,
+    bool clearError = false,
+    bool clearCompletedTransaction = false,
   }) {
     return TransactionState(
       availableProducts: availableProducts ?? this.availableProducts,
@@ -233,6 +231,11 @@ class TransactionState extends Equatable {
       notes: notes ?? this.notes,
       selectedProductIds: selectedProductIds ?? this.selectedProductIds,
       isSelectionMode: isSelectionMode ?? this.isSelectionMode,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      completedTransaction: clearCompletedTransaction
+          ? null
+          : (completedTransaction ?? this.completedTransaction),
     );
   }
 
@@ -253,5 +256,8 @@ class TransactionState extends Equatable {
     notes,
     selectedProductIds,
     isSelectionMode,
+    isLoading,
+    errorMessage,
+    completedTransaction,
   ];
 }

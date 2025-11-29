@@ -9,14 +9,20 @@ import '../../data/models/customer_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/models/payment_method_model.dart' as pm;
+import '../../data/repositories/transaction_repository.dart';
 import '../history_stock/stock_bloc.dart';
 import '../history_stock/stock_event.dart';
 import 'transaction_state.dart';
 
 class TransactionCubit extends Cubit<TransactionState> {
   final StockBloc? stockBloc;
+  final TransactionRepository _repository;
 
-  TransactionCubit({this.stockBloc}) : super(const TransactionState());
+  TransactionCubit({
+    required TransactionRepository repository,
+    this.stockBloc,
+  })  : _repository = repository,
+        super(const TransactionState());
 
   void loadProducts(List<ProductModel> products) {
     emit(state.copyWith(availableProducts: products));
@@ -139,99 +145,163 @@ class TransactionCubit extends Cubit<TransactionState> {
     ));
   }
 
-  TransactionModel getCurrentTransaction() {
-    final transactionId = 'TRX${DateTime.now().millisecondsSinceEpoch}';
-
-    final items = state.selectedItems.map((product) {
-      final qty = state.getQuantity(product.id.toString());
-      final priceAfterDiscount = product.sellingPrice * (1 - product.productDiscount !/ 100);
-      final totalPrice = (priceAfterDiscount * qty).toInt();
-      final profitPerItem = priceAfterDiscount - product.costPrice;
-      final totalProfit = (profitPerItem * qty).toInt();
-
-      return TransactionItem(
-        productId: product.id.toString(),
-        productName: product.productName,
-        quantity: qty,
-        basePrice: product.costPrice,
-        sellingPrice: product.sellingPrice,
-        totalPrice: totalPrice,
-        totalProfit: totalProfit,
-        discount: product.productDiscount,
-      );
-    }).toList();
-
-    final totalProfit = state.netProfit;
-
-    String paymentMethodName = state.paymentMethod.displayName;
-    if (state.selectedPaymentMethodDetail != null) {
-      paymentMethodName = state.selectedPaymentMethodDetail!.name;
-    }
-
-    return TransactionModel(
-      id: transactionId,
-      transactionDate: state.transactionDate ?? DateTime.now(),
-      items: items,
-      subtotal: state.subtotal,
-      discount: state.discount,
-      otherCosts: state.otherCosts,
-      totalPayment: state.finalTotal,
-      totalProfit: totalProfit,
-      receivedAmount: state.receivedAmount ?? 0,
-      changeAmount: state.changeAmount,
-      paymentMethod: paymentMethodName,
-      customer: state.selectedCustomer,
-    );
-  }
-
-  Future<void> saveTransaction() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final transaction = getCurrentTransaction();
-      final savedTransactions = prefs.getStringList('transactions') ?? [];
-      savedTransactions.add(jsonEncode(transaction.toJson()));
-      await prefs.setStringList('transactions', savedTransactions);
-    } catch (e) {
-      print('Error saving transaction: $e');
-    }
-  }
+  // TransactionModel getCurrentTransaction() {
+  //   final transactionId = 'TRX${DateTime.now().millisecondsSinceEpoch}';
+  //
+  //   final items = state.selectedItems.map((product) {
+  //     final qty = state.getQuantity(product.id.toString());
+  //     final priceAfterDiscount = product.sellingPrice * (1 - product.productDiscount !/ 100);
+  //     final totalPrice = (priceAfterDiscount * qty).toInt();
+  //     final profitPerItem = priceAfterDiscount - product.costPrice;
+  //     final totalProfit = (profitPerItem * qty).toInt();
+  //
+  //     return TransactionItem(
+  //       productId: product.id.toString(),
+  //       productName: product.productName,
+  //       quantity: qty,
+  //       basePrice: product.costPrice,
+  //       sellingPrice: product.sellingPrice,
+  //       totalPrice: totalPrice,
+  //       totalProfit: totalProfit,
+  //       discount: product.productDiscount,
+  //     );
+  //   }).toList();
+  //
+  //   final totalProfit = state.netProfit;
+  //
+  //   String paymentMethodName = state.paymentMethod.displayName;
+  //   if (state.selectedPaymentMethodDetail != null) {
+  //     paymentMethodName = state.selectedPaymentMethodDetail!.name;
+  //   }
+  //
+  //   return TransactionModel(
+  //     id: transactionId,
+  //     transactionDate: state.transactionDate ?? DateTime.now(),
+  //     items: items,
+  //     subtotal: state.subtotal,
+  //     discount: state.discount,
+  //     otherCosts: state.otherCosts,
+  //     totalPayment: state.finalTotal,
+  //     totalProfit: totalProfit,
+  //     receivedAmount: state.receivedAmount ?? 0,
+  //     changeAmount: state.changeAmount,
+  //     paymentMethod: paymentMethodName,
+  //     customer: state.selectedCustomer,
+  //   );
+  // }
 
   Future<void> completeAndSaveTransaction() async {
-    completeTransaction();
-    await saveTransaction();
-    if (stockBloc != null) {
-      await _reduceStock();
-    }
-  }
-
-  Future<void> _reduceStock() async {
     try {
-      final transactionId = getCurrentTransaction().id;
-      for (var product in state.selectedItems) {
-        final quantity = state.getQuantity(product.id.toString());
-        stockBloc!.add(AddStockOut(
-          productId: product.id!,
-          quantity: quantity,
-          notes: 'Transaksi: $transactionId',
+      emit(state.copyWith(isLoading: true, clearError: true));
+
+      // Prepare details untuk API
+      final details = state.selectedItems.map((product) {
+        final qty = state.getQuantity(product.id.toString());
+        final priceAfterDiscount = product.sellingPrice * (1 - product.productDiscount !/ 100);
+        final subtotal = (priceAfterDiscount * qty);
+
+        return {
+          'product_id': product.id,
+          'quantity': qty,
+          'selling_price': product.sellingPrice,
+          'cost_price': product.costPrice,
+          'discount': product.productDiscount,
+          'subtotal': subtotal,
+        };
+      }).toList();
+
+      // Call API
+      final response = await _repository.createTransaction(
+        transactionDate: state.transactionDate ?? DateTime.now(),
+        subtotal: state.subtotal,
+        transactionDiscount: state.discount,
+        transactionTax: 0, // Sesuaikan jika ada tax
+        totalTransaction: state.finalTotal,
+        nameOtherCost: state.otherCostsName.isEmpty ? null : state.otherCostsName,
+        otherCost: state.otherCosts,
+        totalPayment: state.receivedAmount ?? state.finalTotal,
+        changeAmount: state.changeAmount,
+        transactionDescription: state.notes.isEmpty ? null : state.notes,
+        totalProfit: state.netProfit,
+        customerId: state.selectedCustomer?.id,
+        companyPaymentMethodId: state.selectedPaymentMethodDetail?.id ?? 1, // Default ID
+        details: details,
+      );
+
+      if (response.success && response.data != null) {
+        emit(state.copyWith(
+          isLoading: false,
+          completedTransaction: response.data,
         ));
-            }
+
+        // Reset transaction setelah berhasil
+        resetTransaction();
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: response.message,
+        ));
+      }
     } catch (e) {
-      // ignore
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'Terjadi kesalahan: ${e.toString()}',
+      ));
     }
   }
 
-  List<Map<String, dynamic>> getStockReductionData() {
-    final transactionId = getCurrentTransaction().id;
-    return state.selectedItems.map((item) {
-      final quantity = state.getQuantity(item.id.toString());
-      return {
-        'productId': item.id,
-        'quantity': quantity,
-        'hasStock': item.productStock,
-        'transactionId': transactionId,
-      };
-    }).where((data) => data['hasStock'] == true).toList();
+  Future<void> fetchTransactions({
+    String? startDate,
+    String? endDate,
+    int? customerId,
+    String? search,
+    int page = 1,
+  }) async {
+    try {
+      emit(state.copyWith(isLoading: true, clearError: true));
+
+      final response = await _repository.getTransactions(
+        startDate: startDate,
+        endDate: endDate,
+        customerId: customerId,
+        search: search,
+        page: page,
+      );
+
+      if (response.success) {
+        // Handle success - bisa tambah field di state untuk list transactions
+        emit(state.copyWith(isLoading: false));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: response.message,
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'Gagal memuat transaksi: ${e.toString()}',
+      ));
+    }
   }
+
+  void clearError() {
+    emit(state.copyWith(clearError: true));
+  }
+
+
+  // List<Map<String, dynamic>> getStockReductionData() {
+  //   final transactionId = getCurrentTransaction().id;
+  //   return state.selectedItems.map((item) {
+  //     final quantity = state.getQuantity(item.id.toString());
+  //     return {
+  //       'productId': item.id,
+  //       'quantity': quantity,
+  //       'hasStock': item.productStock,
+  //       'transactionId': transactionId,
+  //     };
+  //   }).where((data) => data['hasStock'] == true).toList();
+  // }
 
   void setSelectedCustomer(Customer? customer) {
     emit(state.copyWith(selectedCustomer: customer));
