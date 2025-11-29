@@ -92,19 +92,13 @@ class BankListWidget extends StatelessWidget {
     required this.banks,
   });
 
-  Color _getBankColor(String? provider) {
-    switch (provider?.toLowerCase()) {
-      case 'bca':
-        return const Color(0xFF0066CC);
-      case 'mandiri':
-        return const Color(0xFF003D79);
-      case 'bri':
-        return const Color(0xFF003D79);
-      case 'bni':
-        return const Color(0xFFFF6600);
-      default:
-        return primaryGreenColor;
-    }
+  Color _getBankColor(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('bca')) return const Color(0xFF0066CC);
+    if (lowerName.contains('mandiri')) return const Color(0xFF003D79);
+    if (lowerName.contains('bri')) return const Color(0xFF003D79);
+    if (lowerName.contains('bni')) return const Color(0xFFFF6600);
+    return primaryGreenColor; // default
   }
 
   @override
@@ -115,7 +109,7 @@ class BankListWidget extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 8),
           child: BankItem(
             paymentMethod: bank,
-            bankColor: _getBankColor(bank.provider),
+            bankColor: _getBankColor(bank.name),
             onTap: () {
               _showBankConfirmation(context, bank);
             },
@@ -141,7 +135,7 @@ class BankListWidget extends StatelessWidget {
         value: cubit,
         child: BankTransferConfirmationDialog(
           bank: bank,
-          bankColor: _getBankColor(bank.provider),
+          bankColor: _getBankColor(bank.name),
           onConfirm: () {
             final cubit = context.read<TransactionCubit>();
             cubit.setReceivedAmount(cubit.state.finalTotal);
@@ -221,7 +215,7 @@ class BankTransferConfirmationDialog extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      _getBankInitial(bank.provider ?? bank.name),
+                      _getBankInitial(bank.name),
                       style: const TextStyle(
                         fontFamily: fontType,
                         color: Colors.white,
@@ -388,7 +382,7 @@ class BankItem extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    _getBankInitial(paymentMethod.provider ?? paymentMethod.name),
+                    _getBankInitial(paymentMethod.name),
                     style: TextStyle(
                       color: bankColor,
                       fontWeight: FontWeight.bold,

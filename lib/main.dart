@@ -5,7 +5,6 @@ import 'package:pos_mobile/blocs/cashier/cashier_event.dart';
 import 'package:pos_mobile/blocs/financials/finance_bloc.dart';
 import 'package:pos_mobile/blocs/financials/finance_event.dart';
 import 'package:pos_mobile/blocs/sales_report/sales_report_cubit.dart';
-import 'package:pos_mobile/blocs/shop/shop_cubit.dart';
 import 'package:pos_mobile/blocs/transaction/transaction_cubit.dart';
 import 'package:pos_mobile/data/repositories/cashier_repository.dart';
 import 'package:pos_mobile/data/repositories/category_repository.dart';
@@ -21,6 +20,7 @@ import 'blocs/auth/register/register_bloc.dart';
 import 'blocs/cashier/cashier_bloc.dart';
 import 'blocs/category/category_cubit.dart';
 import 'blocs/category/category_event.dart';
+import 'blocs/company/company_cubit.dart';
 import 'blocs/customer/customer_bloc.dart';
 import 'blocs/customer/customer_event.dart';
 import 'blocs/flow_report/flow_report_cubit.dart';
@@ -33,6 +33,8 @@ import 'core/theme/theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:month_year_picker/month_year_picker.dart';
 import 'data/repositories/auth_repository.dart';
+import 'data/repositories/company_repository.dart';
+import 'data/repositories/payment_method_repository.dart';
 import 'data/repositories/profile_repository.dart';
 
 
@@ -64,6 +66,12 @@ class MyApp extends StatelessWidget {
         RepositoryProvider(
           create: (context) => StockRepository(),
         ),
+        RepositoryProvider(
+          create: (context) => CompanyRepository(),
+        ),
+        RepositoryProvider(
+          create: (context) => PaymentMethodRepository(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -90,11 +98,13 @@ class MyApp extends StatelessWidget {
             lazy: false,
           ),
           BlocProvider(
-            create: (_) => PaymentMethodCubit()..loadPaymentMethods(),
+            create: (context) => PaymentMethodCubit(
+              context.read<PaymentMethodRepository>(),
+            )..loadPaymentMethods(),
             lazy: false,
           ),
           BlocProvider(
-            create: (context) => CashierBloc( // ✅ Ganti _ jadi context
+            create: (context) => CashierBloc(
               context.read<CashierRepository>(),
             )..add(const FetchCashiers()),
           ),
@@ -110,7 +120,7 @@ class MyApp extends StatelessWidget {
             create: (_) => FinancialReportCubit(),
           ),
           BlocProvider(
-            create: (_) => ShopCubit()..loadShop(),
+            create: (context) => CompanyCubit(CompanyRepository())..loadCompany(),
           ),
           BlocProvider(
             create: (context) => ProfileCubit(ProfileRepository())..loadProfile(),

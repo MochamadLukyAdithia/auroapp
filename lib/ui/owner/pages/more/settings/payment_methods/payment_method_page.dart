@@ -124,7 +124,7 @@ class PaymentSectionHeader extends StatelessWidget {
   }
 }
 
-class PaymentMethodItem extends StatelessWidget {
+class PaymentMethodItem extends StatefulWidget {
   final PaymentMethod paymentMethod;
   final ValueChanged<bool> onChanged;
 
@@ -133,6 +133,13 @@ class PaymentMethodItem extends StatelessWidget {
     required this.paymentMethod,
     required this.onChanged,
   });
+
+  @override
+  State<PaymentMethodItem> createState() => _PaymentMethodItemState();
+}
+
+class _PaymentMethodItemState extends State<PaymentMethodItem> {
+  bool _isToggling = false;
 
   @override
   Widget build(BuildContext context) {
@@ -147,48 +154,34 @@ class PaymentMethodItem extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  paymentMethod.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
-                    fontFamily: fontType,
-                  ),
-                ),
-                // if (paymentMethod.accountNumber != null &&
-                //     paymentMethod.accountNumber!.isNotEmpty) ...[
-                //   const SizedBox(height: 4),
-                //   Text(
-                //     paymentMethod.accountNumber!,
-                //     style: TextStyle(
-                //       fontSize: 12,
-                //       color: Colors.grey.shade600,
-                //       fontFamily: fontType,
-                //     ),
-                //   ),
-                // ],
-                // if (paymentMethod.accountName != null &&
-                //     paymentMethod.accountName!.isNotEmpty) ...[
-                //   const SizedBox(height: 2),
-                //   Text(
-                //     paymentMethod.accountName!,
-                //     style: TextStyle(
-                //       fontSize: 12,
-                //       color: Colors.grey.shade600,
-                //       fontFamily: fontType,
-                //     ),
-                //   ),
-                // ],
-              ],
+            child: Text(
+              widget.paymentMethod.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+                fontFamily: fontType,
+              ),
             ),
           ),
-          Switch(
-            value: paymentMethod.isEnabled,
-            onChanged: onChanged,
+          // ✅ Show loading saat toggle
+          _isToggling
+              ? const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+              : Switch(
+            value: widget.paymentMethod.isEnabled,
+            onChanged: (value) async {
+              setState(() => _isToggling = true);
+              widget.onChanged(value);
+              // Wait sebentar untuk animasi
+              await Future.delayed(const Duration(milliseconds: 500));
+              if (mounted) {
+                setState(() => _isToggling = false);
+              }
+            },
             activeColor: Colors.white,
             activeTrackColor: primaryGreenColor,
             inactiveThumbColor: Colors.white,
@@ -199,4 +192,3 @@ class PaymentMethodItem extends StatelessWidget {
     );
   }
 }
-

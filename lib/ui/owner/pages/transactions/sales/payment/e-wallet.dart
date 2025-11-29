@@ -94,30 +94,22 @@ class EwalletListWidget extends StatelessWidget {
     required this.ewallets,
   });
 
-  Color _getEwalletColor(String? provider) {
-    switch (provider?.toLowerCase()) {
-      case 'gopay':
-        return const Color(0xFF00AA13);
-      case 'ovo':
-        return const Color(0xFF4B2D83);
-      case 'dana':
-        return const Color(0xFF118EEA);
-      case 'shopeepay':
-        return const Color(0xFFEE4D2D);
-      default:
-        return primaryGreenColor;
-    }
+  Color _getEwalletColor(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('gopay')) return const Color(0xFF00AA13);
+    if (lowerName.contains('ovo')) return const Color(0xFF4C3494);
+    if (lowerName.contains('shopee')) return const Color(0xFFEE4D2D);
+    if (lowerName.contains('dana')) return const Color(0xFF118EEA);
+    return Colors.blue; // default
   }
 
-  IconData _getEwalletIcon(String? provider) {
-    switch (provider?.toLowerCase()) {
-      case 'gopay':
-        return Icons.two_wheeler;
-      case 'shopeepay':
-        return Icons.shopping_bag;
-      default:
-        return Icons.account_balance_wallet;
-    }
+  String _getEwalletIcon(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('gopay')) return 'assets/icons/gopay.png';
+    if (lowerName.contains('ovo')) return 'assets/icons/ovo.png';
+    if (lowerName.contains('shopee')) return 'assets/icons/shopeepay.png';
+    if (lowerName.contains('dana')) return 'assets/icons/dana.png';
+    return 'assets/icons/ewallet_default.png'; // default
   }
 
   @override
@@ -128,8 +120,8 @@ class EwalletListWidget extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 8),
           child: EwalletItem(
             paymentMethod: ewallet,
-            ewalletColor: _getEwalletColor(ewallet.provider),
-            icon: _getEwalletIcon(ewallet.provider),
+            ewalletColor: _getEwalletColor(ewallet.name),
+            // icon: _getEwalletIcon(ewallet.name).toString(),
             onTap: () {
               _showEwalletConfirmation(context, ewallet);
             },
@@ -155,8 +147,8 @@ class EwalletListWidget extends StatelessWidget {
         value: cubit,
         child: EwalletConfirmationDialog(
           ewallet: ewallet,
-          ewalletColor: _getEwalletColor(ewallet.provider),
-          icon: _getEwalletIcon(ewallet.provider),
+          ewalletColor: _getEwalletColor(ewallet.name),
+          // icon: _getEwalletIcon(ewallet.provider),
           onConfirm: () {
             final cubit = context.read<TransactionCubit>();
             // 1. SET UANG DITERIMA = totalte.finalTotal);
@@ -190,7 +182,7 @@ class EwalletListWidget extends StatelessWidget {
 class EwalletConfirmationDialog extends StatelessWidget {
   final pm.PaymentMethod ewallet;
   final Color ewalletColor;
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
@@ -198,7 +190,7 @@ class EwalletConfirmationDialog extends StatelessWidget {
   super.key,
   required this.ewallet,
   required this.ewalletColor,
-  required this.icon,
+  this.icon,
   required this.onConfirm,
   required this.onCancel,
 });
@@ -238,7 +230,7 @@ class EwalletConfirmationDialog extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      _getBankInitial(ewallet.provider ?? ewallet.name),
+                      _getBankInitial(ewallet.name),
                       style: const TextStyle(
                         fontFamily: fontType,
                         color: Colors.white,
@@ -375,14 +367,14 @@ class EwalletConfirmationDialog extends StatelessWidget {
 class EwalletItem extends StatelessWidget {
   final pm.PaymentMethod paymentMethod;
   final Color ewalletColor;
-  final IconData icon;
+  final IconData? icon;
   final VoidCallback onTap;
 
   const EwalletItem({
     super.key,
     required this.paymentMethod,
     required this.ewalletColor,
-    required this.icon,
+    this.icon,
     required this.onTap,
   });
 
