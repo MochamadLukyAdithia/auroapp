@@ -103,7 +103,7 @@
 import 'package:equatable/equatable.dart';
 
 class Customer extends Equatable {
-  final String? id;
+  final int? id;
   final String name;
   final String? address;
   final String phone;
@@ -123,7 +123,7 @@ class Customer extends Equatable {
 
   // ✅ copyWith untuk update
   Customer copyWith({
-    String? id,
+    int? id,
     String? name,
     String? address,
     String? phone,
@@ -146,7 +146,7 @@ class Customer extends Equatable {
   factory Customer.fromJson(Map<String, dynamic> json) {
     try {
       return Customer(
-        id: json['id']?.toString(),
+        id: json['id'],
         name: json['customer_name'] as String? ?? json['name'] as String? ?? '',
         address: json['customer_address'] as String? ?? json['address'] as String?,
         phone: json['customer_phone'] as String? ?? json['phone'] as String? ?? '',
