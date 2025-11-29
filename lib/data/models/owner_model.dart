@@ -105,11 +105,13 @@ class RegisterResponse {
   final bool success;
   final String? message;
   final RegisterData? data;
+  final bool? otpSent;
 
   RegisterResponse({
     required this.success,
     this.message,
     this.data,
+    this.otpSent
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
@@ -143,5 +145,34 @@ class RegisterData {
       'user_id': userId,
       'otp_sent': otpSent,
     };
+  }
+}
+
+// resend from login
+class ResendOtpResponse {
+  final bool success;
+  final String message;
+  final int? userId;
+  final bool? otpSent;
+
+  ResendOtpResponse({
+    required this.success,
+    required this.message,
+    this.userId,
+    this.otpSent,
+  });
+
+  factory ResendOtpResponse.fromJson(Map<String, dynamic> json) {
+    // Parse struktur ResponseFormatter Laravel
+    final meta = json['meta'];
+    final data = json['data'];
+
+    return ResendOtpResponse(
+        success: (meta?['code'] == 200 || meta?['code'] == 201) ||
+            (meta?['status'] == true),
+        message: meta?['message'] ?? 'Unknown error',
+        userId: data?['user_id'],
+        otpSent: data?['otp_sent']
+    );
   }
 }
