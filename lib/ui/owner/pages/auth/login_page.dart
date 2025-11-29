@@ -39,7 +39,7 @@ class _LoginPageState extends State<LoginPage> {
 
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
-              Navigator.pushReplacementNamed(context, AppRoutes.homepage);
+              Navigator.pushReplacementNamed(context, AppRoutes.authChecker);
             }
           });
         }
@@ -59,41 +59,49 @@ class _LoginPageState extends State<LoginPage> {
           });
         }
       },
-        child: Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const _LoginHeader(),
-                  Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 20),
-                        const _EmailField(),
-                        const SizedBox(height: 24),
-                        _PasswordField(
-                          obscurePassword: _obscurePassword,
-                          onToggleVisibility: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        const _SignUpPrompt(),
-                        const SizedBox(height: 32),
-                        const _LoginButton(),
-                      ],
-                    ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,  //  Tambah ini
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const _LoginHeader(),
+                Padding(
+                  padding: EdgeInsets.only(  //  Ubah jadi EdgeInsets.only
+                    left: 24,
+                    right: 24,
+                    top: 0,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,  // Magine
                   ),
-                ],
-              ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      const _EmailField(),
+                      const SizedBox(height: 24),
+                      _PasswordField(
+                        obscurePassword: _obscurePassword,
+                        onToggleVisibility: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      const _SignUpPrompt(),
+                      const SizedBox(height: 16),
+                      const _ResendOtpPrompt(),
+                      const SizedBox(height: 32),
+                      const _LoginButton(),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
       );
   }
 }
@@ -363,6 +371,40 @@ class _LoginButton extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// Tambahkan di login_page.dart
+class _ResendOtpPrompt extends StatelessWidget {
+  const _ResendOtpPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'Belum dapat kode OTP? ',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        GestureDetector(
+          onTap: () {
+            Navigator.pushNamed(context, AppRoutes.resendOtp);
+          },
+          child: const Text(
+            'Kirim Ulang',
+            style: TextStyle(
+              fontSize: 14,
+              color: primaryGreenColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
