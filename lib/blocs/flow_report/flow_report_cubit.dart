@@ -102,8 +102,8 @@ class FinancialReportState extends Equatable {
   }
 
   // Total penjualan dari transaksi
-  int get totalSales {
-    return filteredTransactions.fold<int>(
+  double get totalSales {
+    return filteredTransactions.fold<double>(
       0,
           (sum, t) => sum + t.totalPayment,
     );
@@ -124,18 +124,18 @@ class FinancialReportState extends Equatable {
   }
 
   // ✅ Total Pemasukan = Pemasukan dari penjualan + Pemasukan lain
-  int get totalRevenue {
+  double get totalRevenue {
     return totalSales + totalIncome;
   }
 
   // ✅ Pendapatan Neto = Total Pemasukan - Total Pengeluaran
-  int get netIncome {
+  double get netIncome {
     return totalRevenue - totalExpense;
   }
 
   // Total keuntungan dari penjualan
-  int get totalProfit {
-    return filteredTransactions.fold<int>(
+  double get totalProfit {
+    return filteredTransactions.fold<double>(
       0,
           (sum, t) => sum + t.totalProfit,
     );
