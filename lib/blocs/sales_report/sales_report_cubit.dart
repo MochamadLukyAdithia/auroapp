@@ -74,8 +74,8 @@ class SalesReportState extends Equatable {
   }
 
   // Total penjualan
-  int get totalSales {
-    return filteredTransactions.fold<int>(
+  double get totalSales {
+    return filteredTransactions.fold<double>(
       0,
           (sum, t) => sum + t.totalPayment,
     );
@@ -85,16 +85,16 @@ class SalesReportState extends Equatable {
   int get totalTransactions => filteredTransactions.length;
 
   // Total item terjual
-  int get totalItemsSold {
-    return filteredTransactions.fold<int>(
+  double get totalItemsSold {
+    return filteredTransactions.fold<double>(
       0,
-          (sum, t) => sum + t.items.fold<int>(0, (s, item) => s + item.quantity),
+          (sum, t) => sum + t.items.fold<double>(0, (s, item) => s + item.quantity),
     );
   }
 
   // ✅ Total keuntungan
-  int get totalProfit {
-    return filteredTransactions.fold<int>(
+  double get totalProfit {
+    return filteredTransactions.fold<double>(
       0,
           (sum, t) => sum + t.totalProfit,
     );
@@ -107,8 +107,8 @@ class SalesReportState extends Equatable {
   }
 
   // Data untuk grafik (7 hari terakhir atau sesuai periode)
-  Map<DateTime, int> get chartData {
-    final Map<DateTime, int> data = {};
+  Map<DateTime, double> get chartData {
+    final Map<DateTime, double> data = {};
     final now = DateTime.now();
 
     // ✅ Jika ada custom date range
