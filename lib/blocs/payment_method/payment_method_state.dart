@@ -1,4 +1,3 @@
-// blocs/payment_method/payment_method_state.dart
 import 'package:equatable/equatable.dart';
 import '../../data/models/payment_method_model.dart';
 
@@ -18,7 +17,7 @@ class PaymentMethodLoaded extends PaymentMethodState {
 
   const PaymentMethodLoaded({required this.paymentMethods});
 
-  // Filter by type
+  // ✅ Helper untuk grouping by type
   List<PaymentMethod> get qrisMethods =>
       paymentMethods.where((p) => p.type == PaymentType.qris).toList();
 
@@ -28,21 +27,8 @@ class PaymentMethodLoaded extends PaymentMethodState {
   List<PaymentMethod> get bankMethods =>
       paymentMethods.where((p) => p.type == PaymentType.bank).toList();
 
-  // Filter enabled methods (untuk transaksi)
-  List<PaymentMethod> get enabledMethods =>
-      paymentMethods.where((p) => p.isEnabled).toList();
-
   @override
   List<Object?> get props => [paymentMethods];
-}
-
-class PaymentMethodError extends PaymentMethodState {
-  final String message;
-
-  const PaymentMethodError(this.message);
-
-  @override
-  List<Object> get props => [message];
 }
 
 class PaymentMethodOperationSuccess extends PaymentMethodState {
@@ -51,5 +37,14 @@ class PaymentMethodOperationSuccess extends PaymentMethodState {
   const PaymentMethodOperationSuccess(this.message);
 
   @override
-  List<Object> get props => [message];
+  List<Object?> get props => [message];
+}
+
+class PaymentMethodError extends PaymentMethodState {
+  final String message;
+
+  const PaymentMethodError(this.message);
+
+  @override
+  List<Object?> get props => [message];
 }
