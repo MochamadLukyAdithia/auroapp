@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/change_password_model.dart';
 import '../models/login_model.dart';
 import '../models/owner_model.dart';
-import '../models/verification_model.dart';
+import '../models/verification_model.dart' hide ResendOtpResponse;
 import 'dio.dart';
 
 
@@ -59,8 +59,8 @@ class AuthRepository {
     }
   }
 
-// Update method resendOtp
-  Future<ResendOtpResponse> resendOtp(int userId) async {
+// Update method resendOtp lewat register
+  Future<ResendOtpResponse> resendOtpFromRegister(int userId) async {
     try {
       final response = await _dio.post(
         '/resend-otp',
@@ -69,6 +69,23 @@ class AuthRepository {
       return ResendOtpResponse.fromJson(response.data);
     } on DioException catch (e) {
       if (e.response != null) {
+        return ResendOtpResponse.fromJson(e.response!.data);
+      }
+      throw Exception('Network error: ${e.message}');
+    }
+  }
+
+  // resendOtp lewat login
+  Future<ResendOtpResponse> resendOtp({required String email}) async {
+    try {
+      final response = await _dio.post(
+        '/resend-otp',
+        data: {'email': email}, // ✅ Hanya kirim email
+      );
+
+      return ResendOtpResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
         return ResendOtpResponse.fromJson(e.response!.data);
       }
       throw Exception('Network error: ${e.message}');
