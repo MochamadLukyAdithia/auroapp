@@ -1,100 +1,129 @@
-// data/models/payment_method_model.dart
 import 'package:equatable/equatable.dart';
 
 enum PaymentType {
+  cash,
   qris,
   ewallet,
   bank,
 }
 
-enum EwalletProvider {
-  gopay,
-  ovo,
-  shopeepay,
-  dana,
-}
-
-enum BankProvider {
-  mandiri,
-  bca,
-  bri,
-  bni,
-}
-
 class PaymentMethod extends Equatable {
-  final String id;
-  final PaymentType type;
+  final int id;
   final String name;
+  final PaymentType type;
   final bool isEnabled;
-  final String? provider; // untuk ewallet: 'gopay', 'ovo', dll | bank: 'mandiri', 'bca', dll
-  // final String? accountNumber; // untuk bank/ewallet (opsional)
-  // final String? accountName; // untuk bank (opsional)
 
   const PaymentMethod({
     required this.id,
-    required this.type,
     required this.name,
+    required this.type,
     required this.isEnabled,
-    this.provider,
-    // this.accountNumber,
-    // this.accountName,
   });
 
-  PaymentMethod copyWith({
-    String? id,
-    PaymentType? type,
-    String? name,
-    bool? isEnabled,
-    String? provider,
-    String? accountNumber,
-    String? accountName,
-  }) {
-    return PaymentMethod(
-      id: id ?? this.id,
-      type: type ?? this.type,
-      name: name ?? this.name,
-      isEnabled: isEnabled ?? this.isEnabled,
-      provider: provider ?? this.provider,
-      // accountNumber: accountNumber ?? this.accountNumber,
-      // accountName: accountName ?? this.accountName,
-    );
-  }
-
+  // ✅ From JSON (dari API)
   factory PaymentMethod.fromJson(Map<String, dynamic> json) {
     return PaymentMethod(
-      id: json['id'] as String,
-      type: PaymentType.values.firstWhere(
-            (e) => e.name == json['type'],
-        orElse: () => PaymentType.qris,
-      ),
-      name: json['name'] as String,
-      isEnabled: json['is_enabled'] as bool? ?? false,
-      provider: json['provider'] as String?,
-      // accountNumber: json['account_number'] as String?,
-      // accountName: json['account_name'] as String?,
+      id: json['id'],
+      name: json['payment_methods_name'],
+      type: _parsePaymentType(json['type_payment_method']),
+      isEnabled: json['status_payment_methods'].toString() == '1', // ✅ Handle string
     );
   }
 
+  // ✅ To JSON (untuk update ke API)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'type': type.name,
-      'name': name,
-      'is_enabled': isEnabled,
-      if (provider != null) 'provider': provider,
-      // if (accountNumber != null) 'account_number': accountNumber,
-      // if (accountName != null) 'account_name': accountName,
+      'payment_methods_name': name,
+      'type_payment_method': _paymentTypeToString(type),
+      'status_payment_methods': isEnabled ? 1 : 0,
     };
   }
 
+  // ✅ Copy with
+  PaymentMethod copyWith({
+    int? id,
+    String? name,
+    PaymentType? type,
+    bool? isEnabled,
+  }) {
+    return PaymentMethod(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      isEnabled: isEnabled ?? this.isEnabled,
+    );
+  }
+
+  // ✅ Helper: String to PaymentType
+  static PaymentType _parsePaymentType(String type) {
+    switch (type.toLowerCase().replaceAll('-', '').replaceAll(' ', '')) {
+      case 'cash':
+        return PaymentType.cash;
+      case 'qris':
+        return PaymentType.qris;
+      case 'ewallet':
+        return PaymentType.ewallet;
+      case 'banktransfer':
+      case 'bank':
+        return PaymentType.bank;
+      default:
+        return PaymentType.cash;
+    }
+  }
+
+  // ✅ Helper: PaymentType to String
+  static String _paymentTypeToString(PaymentType type) {
+    switch (type) {
+      case PaymentType.cash:
+        return 'cash';
+      case PaymentType.qris:
+        return 'QRIS';
+      case PaymentType.ewallet:
+        return 'E-Wallet';
+      case PaymentType.bank:
+        return 'Bank Transfer';
+    }
+  }
+
   @override
-  List<Object?> get props => [
-    id,
-    type,
-    name,
-    isEnabled,
-    provider,
-    // accountNumber,
-    // accountName,
-  ];
+  List<Object?> get props => [id, name, type, isEnabled];
+}
+
+// ✅ Response wrapper untuk grouped data
+class PaymentMethodsGrouped {
+  final List<PaymentMethod> cash;
+  final List<PaymentMethod> qris;
+  final List<PaymentMethod> ewallet;
+  final List<PaymentMethod> bank;
+
+  PaymentMethodsGrouped({
+    required this.cash,
+    required this.qris,
+    required this.ewallet,
+    required this.bank,
+  });
+
+  factory PaymentMethodsGrouped.fromJson(Map<String, dynamic> json) {
+    return PaymentMethodsGrouped(
+      cash: (json['cash'] as List?)
+          ?.map((e) => PaymentMethod.fromJson(e))
+          .toList() ??
+          [],
+      qris: (json['QRIS'] as List?)  // ✅ Sesuai response API
+          ?.map((e) => PaymentMethod.fromJson(e))
+          .toList() ??
+          [],
+      ewallet: (json['E-Wallet'] as List?)  // ✅ Sesuai response API
+          ?.map((e) => PaymentMethod.fromJson(e))
+          .toList() ??
+          [],
+      bank: (json['Bank Transfer'] as List?)  // ✅ Sesuai response API
+          ?.map((e) => PaymentMethod.fromJson(e))
+          .toList() ??
+          [],
+    );
+  }
+
+  List<PaymentMethod> get allMethods => [...cash, ...qris, ...ewallet, ...bank];
 }
