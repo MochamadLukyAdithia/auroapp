@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart'; // ✅ Tambahkan import ini
 import 'package:pos_mobile/ui/owner/pages/auth/register_page.dart';
+import 'package:pos_mobile/ui/owner/pages/auth/resend_otp_from_login.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/add_finance.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/filtered_finance_date.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/finance_page.dart';
@@ -11,7 +12,7 @@ import 'package:pos_mobile/ui/owner/pages/more/settings/cashiers/add_cashier.dar
 import 'package:pos_mobile/ui/owner/pages/more/settings/owner_profile/owner_profile.dart';
 import 'package:pos_mobile/ui/owner/pages/more/settings/payment_methods/add_payment_method_page.dart';
 import 'package:pos_mobile/ui/owner/pages/more/settings/payment_methods/payment_method_page.dart';
-import 'package:pos_mobile/ui/owner/pages/more/settings/shop/shop_page_update.dart';
+import 'package:pos_mobile/ui/owner/pages/more/settings/shop/company_page_update.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/bank.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/cash.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/choose_customer.dart';
@@ -19,9 +20,13 @@ import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_payment.dart
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_transaction.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/e-wallet.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
+import '../blocs/auth/verification/verification_bloc.dart';
 import '../blocs/customer/customer_bloc.dart'; // ✅ Tambahkan import CustomerBloc
 import '../data/models/customer_model.dart';
+import '../data/repositories/auth_repository.dart';
+import '../ui/owner/pages/auth/auth_checker.dart';
 import '../ui/owner/pages/auth/login_page.dart';
+import '../ui/owner/pages/auth/onboarding_page.dart';
 import '../ui/owner/pages/auth/verification_page.dart';
 import '../ui/owner/pages/more/about/about_page.dart';
 import '../ui/owner/pages/more/customers/add_customer_page.dart';
@@ -39,7 +44,7 @@ import '../ui/owner/pages/more/report/report_page.dart';
 import '../ui/owner/pages/more/report/sales/sales_report.dart';
 import '../ui/owner/pages/more/settings/cashiers/cashier_page.dart';
 import '../ui/owner/pages/more/settings/setting_page.dart';
-import '../ui/owner/pages/more/settings/shop/shop_page.dart';
+import '../ui/owner/pages/more/settings/shop/company_page.dart';
 import '../ui/owner/pages/more/suppliers/add_supplier.dart';
 import '../ui/owner/pages/more/suppliers/supplier_page.dart';
 import '../ui/owner/pages/products_categories/categories/add_category_page.dart';
@@ -57,6 +62,9 @@ class AppRoutes {
   static const String login = '/auth/login/';
   static const String register = '/auth/register';
   static const String verification = '/auth/register/verification';
+  static const String resendOtp = '/auth/login/verification';
+  static const String authChecker = '/auth/login/auth_checker';
+  static const String onboarding = '/auth/login/auth_checker/onboarding';
   static const String homepage = '/bottom_bar';
 
   //---------------- PRODUCTS PAGE ----------------
@@ -126,8 +134,51 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RegisterPage());
 
       case verification:
-        return MaterialPageRoute(builder: (_) => const VerificationPage(),
-        settings: settings);
+      // ✅ Ambil arguments dari VerificationPage
+        final args = settings.arguments as Map<String, dynamic>?;
+
+        // Validasi arguments
+        if (args == null || args['userId'] == null || args['email'] == null) {
+          return MaterialPageRoute(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Error')),
+              body: const Center(
+                child: Text('Data verifikasi tidak valid. Silakan registrasi ulang.'),
+              ),
+            ),
+          );
+        }
+
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => VerificationBloc(
+              authRepository: context.read<AuthRepository>(),
+              userId: args['userId'] as int,
+              email: args['email'] as String,
+            ),
+            child: const VerificationPage(),
+          ),
+          settings: settings,
+        );
+
+      case resendOtp:
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => VerificationBloc(
+              authRepository: context.read<AuthRepository>(),
+              userId: 0,
+              email: '',
+            ),
+            child: const ResendOtpPage(),
+          ),
+        );
+
+
+      case authChecker:
+        return MaterialPageRoute(builder: (_) => const AuthChecker());
+
+      case onboarding:
+        return MaterialPageRoute(builder: (_) => const OnboardingPage());
 
       case homepage:
         return MaterialPageRoute(builder: (_) => const BottomBar());
