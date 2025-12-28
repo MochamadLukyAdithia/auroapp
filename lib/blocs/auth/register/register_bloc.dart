@@ -5,7 +5,6 @@ import '../../../data/models/owner_model.dart';
 import 'register_event.dart';
 import 'register_state.dart';
 
-
 class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
   RegisterBloc(this._authRepository) : super(const RegisterState()) {
     on<RegisterNameChanged>(_onNameChanged);
@@ -59,11 +58,10 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
 
     if (password.isEmpty) {
       error = 'Password tidak boleh kosong';
-    } else if (password.length < 6) {
-      error = 'Password minimal 6 karakter';
+    } else if (password.length < 8) {
+      error = 'Password minimal 8 karakter';
     }
 
-    // Clear confirm password error jika sekarang sudah match
     String? confirmError = state.confirmPasswordError;
     if (state.confirmPassword.isNotEmpty) {
       if (password == state.confirmPassword) {
@@ -114,91 +112,9 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
       phoneError: error,
     ));
   }
-  // Future<void> _onSubmitted(
-  //     RegisterSubmitted event, Emitter<RegisterState> emit) async {
-  //
-  //   // Validasi manual untuk field yang belum diisi
-  //   String? nameError = state.nameError;
-  //   if (state.name.trim().isEmpty && nameError == null) {
-  //     nameError = 'Nama lengkap tidak boleh kosong';
-  //   }
-  //
-  //   String? emailError = state.emailError;
-  //   if (state.email.trim().isEmpty && emailError == null) {
-  //     emailError = 'Email tidak boleh kosong';
-  //   }
-  //
-  //   String? passwordError = state.passwordError;
-  //   if (state.password.isEmpty && passwordError == null) {
-  //     passwordError = 'Password tidak boleh kosong';
-  //   }
-  //
-  //   String? confirmPasswordError = state.confirmPasswordError;
-  //   if (state.confirmPassword.isEmpty && confirmPasswordError == null) {
-  //     confirmPasswordError = 'Konfirmasi password tidak boleh kosong';
-  //   }
-  //
-  //   String? phoneError = state.phoneError;
-  //   if (state.phone.trim().isEmpty && phoneError == null) {
-  //     phoneError = 'Nomor telepon tidak boleh kosong';
-  //   }
-  //
-  //   // Jika ada error, tampilkan semua error
-  //   if (nameError != null || emailError != null || passwordError != null ||
-  //       confirmPasswordError != null || phoneError != null) {
-  //     emit(state.copyWith(
-  //       status: RegisterStatus.failure,
-  //       errorMessage: 'Mohon lengkapi semua field dengan benar',
-  //       nameError: nameError,
-  //       emailError: emailError,
-  //       passwordError: passwordError,
-  //       confirmPasswordError: confirmPasswordError,
-  //       phoneError: phoneError,
-  //     ));
-  //     return;
-  //   }
-  //
-  //   emit(state.copyWith(status: RegisterStatus.loading));
-  //
-  //   try {
-  //     final owner = Owner(
-  //       id: 0,
-  //       fullName: state.name.trim(),
-  //       email: state.email.trim(),
-  //       phoneNumber: state.phone.trim(),
-  //       userAddress: '',
-  //     );
-  //
-  //     // ✅ Gunakan toRegisterJson
-  //     final requestData = owner.toRegisterJson(
-  //       state.password,
-  //       state.confirmPassword,
-  //     );
-  //
-  //     final response = await _authRepository.registerOwner(requestData);
-  //
-  //     if (response.success) {
-  //       emit(state.copyWith(
-  //         status: RegisterStatus.success,
-  //         userId: response.data?.userId,
-  //       ));
-  //     }else {
-  //       emit(state.copyWith(
-  //         status: RegisterStatus.failure,
-  //         errorMessage: response.message,
-  //       ));
-  //     }
-  //   } catch (e) {
-  //     emit(state.copyWith(
-  //       status: RegisterStatus.failure,
-  //       errorMessage: 'Gagal melakukan registrasi: ${e.toString()}',
-  //     ));
-  //   }
-  // }
 
   Future<void> _onSubmitted(
       RegisterSubmitted event, Emitter<RegisterState> emit) async {
-
 
     // Validasi manual untuk field yang belum diisi
     String? nameError = state.nameError;
@@ -229,7 +145,6 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
     // Jika ada error, tampilkan semua error
     if (nameError != null || emailError != null || passwordError != null ||
         confirmPasswordError != null || phoneError != null) {
-
       emit(state.copyWith(
         status: RegisterStatus.failure,
         errorMessage: 'Mohon lengkapi semua field dengan benar',
@@ -250,7 +165,8 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         fullName: state.name.trim(),
         email: state.email.trim(),
         phoneNumber: state.phone.trim(),
-        userAddress: '',
+        password: state.password.trim(),
+        confirmPassword: state.confirmPassword.trim(),
         role: AuthService.ROLE_OWNER,
       );
 
@@ -259,24 +175,48 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         state.confirmPassword,
       );
 
-
       final response = await _authRepository.registerOwner(requestData);
 
-
       if (response.success) {
-
         emit(state.copyWith(
           status: RegisterStatus.success,
           userId: response.data?.userId,
         ));
       } else {
+        // ✅ IMPROVED: Handle error dari backend dengan lebih baik
+        String? emailErr;
+        String? phoneErr;
+        String? generalErr;
+
+        // Prioritaskan error dari response.errors (field-specific)
+        if (response.errors != null) {
+          emailErr = response.errors!['email'];
+          phoneErr = response.errors!['phone'];
+        }
+
+        // Fallback ke message jika tidak ada errors spesifik
+        if (emailErr == null && phoneErr == null) {
+          final msg = response.message ?? 'Registrasi gagal';
+
+          // Cek keyword di message
+          if (msg.toLowerCase().contains('email')) {
+            emailErr = msg;
+          } else if (msg.toLowerCase().contains('telepon') ||
+              msg.toLowerCase().contains('phone')) {
+            phoneErr = msg;
+          } else {
+            generalErr = msg;
+          }
+        }
+
         emit(state.copyWith(
           status: RegisterStatus.failure,
-          errorMessage: response.message ?? 'Registrasi gagal',
+          emailError: emailErr,
+          phoneError: phoneErr,
+          errorMessage: generalErr,
         ));
       }
     } catch (e) {
-
       emit(state.copyWith(
         status: RegisterStatus.failure,
         errorMessage: 'Gagal melakukan registrasi: ${e.toString()}',
