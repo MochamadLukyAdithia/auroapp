@@ -47,7 +47,7 @@ class CashierLoaded extends CashierState {
     return cashiers.where((cashier) {
       return cashier.fullName.toLowerCase().contains(query) ||
           cashier.phoneNumber.toLowerCase().contains(query) ||
-          cashier.email.toLowerCase().contains(query);
+          cashier.email!.toLowerCase().contains(query);
     }).toList();
   }
 

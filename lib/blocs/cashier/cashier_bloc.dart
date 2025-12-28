@@ -16,7 +16,7 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
     on<SearchCashier>(_onSearchCashier);
   }
 
-  // ✅ FETCH - Load cashiers dari API dengan pagination dan search
+  // FETCH
   Future<void> _onFetchCashiers(
       FetchCashiers event,
       Emitter<CashierState> emit,
@@ -30,9 +30,9 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
 
       if (response.success && response.data != null) {
         final allUsers = response.data!['cashiers'] as List<Cashier>;
-        final cashiers = allUsers.where((user) =>
-        user.role == AuthService.ROLE_CASHIER
-        ).toList();
+        final cashiers = allUsers
+            .where((user) => user.role == AuthService.ROLE_CASHIER)
+            .toList();
 
         final pagination = {
           'current_page': response.data!['current_page'],
@@ -50,18 +50,17 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
         emit(CashierError(response.message));
       }
     } catch (e) {
-      emit(CashierError('Gagal memuat data kasir: ${e.toString()}'));
+      emit(CashierError('Gagal memuat data kasir: $e'));
     }
   }
 
-  // ✅ ADD - Create cashier baru via API
+  // ADD
   Future<void> _onAddCashier(
       AddCashier event,
       Emitter<CashierState> emit,
       ) async {
     emit(CashierLoading());
     try {
-      // Validasi password
       if (event.password.isEmpty || event.passwordConfirmation.isEmpty) {
         emit(const CashierError('Password tidak boleh kosong'));
         return;
@@ -72,7 +71,6 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
         return;
       }
 
-      // Panggil API create cashier
       final response = await _cashierRepository.createCashier(
         cashier: event.cashier,
         password: event.password,
@@ -80,11 +78,12 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
       );
 
       if (response.success) {
-        // ✅ PERBAIKI: Refresh dulu, baru emit success
-        final refreshResponse = await _cashierRepository.getCashiers(limit: 100);
+        final refreshResponse =
+        await _cashierRepository.getCashiers(limit: 100);
 
         if (refreshResponse.success && refreshResponse.data != null) {
-          final cashiers = refreshResponse.data!['cashiers'] as List<Cashier>;
+          final cashiers =
+          refreshResponse.data!['cashiers'] as List<Cashier>;
           final pagination = {
             'current_page': refreshResponse.data!['current_page'],
             'last_page': refreshResponse.data!['last_page'],
@@ -102,44 +101,49 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
         emit(CashierError(response.message));
       }
     } catch (e) {
-      emit(CashierError('Gagal menambahkan kasir: ${e.toString()}'));
+      emit(CashierError('Gagal menambahkan kasir: $e'));
     }
   }
 
-  // ✅ UPDATE - Update cashier via API
+  // UPDATE (Password boleh kosong)
   Future<void> _onUpdateCashier(
       UpdateCashier event,
       Emitter<CashierState> emit,
       ) async {
     emit(CashierLoading());
     try {
-      // Validasi ID
       if (event.cashier.id == null) {
         emit(const CashierError('ID kasir tidak valid'));
         return;
       }
 
-      // Validasi password jika diisi
+      // Password optional
+      bool includePassword = false;
+
       if (event.password != null && event.password!.isNotEmpty) {
         if (event.passwordConfirmation == null ||
             event.password != event.passwordConfirmation) {
           emit(const CashierError('Konfirmasi password tidak sesuai'));
           return;
         }
+        includePassword = true;
       }
 
-      // Panggil API update cashier
       final response = await _cashierRepository.updateCashier(
         id: event.cashier.id!,
         cashier: event.cashier,
+        password: includePassword ? event.password : null,
+        passwordConfirmation:
+        includePassword ? event.passwordConfirmation : null,
       );
 
       if (response.success) {
-        // ✅ Refresh dulu
-        final refreshResponse = await _cashierRepository.getCashiers(limit: 100);
+        final refreshResponse =
+        await _cashierRepository.getCashiers(limit: 100);
 
         if (refreshResponse.success && refreshResponse.data != null) {
-          final cashiers = refreshResponse.data!['cashiers'] as List<Cashier>;
+          final cashiers =
+          refreshResponse.data!['cashiers'] as List<Cashier>;
           final pagination = {
             'current_page': refreshResponse.data!['current_page'],
             'last_page': refreshResponse.data!['last_page'],
@@ -150,32 +154,36 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
           emit(CashierLoaded(
             cashiers: cashiers,
             pagination: pagination,
-            successMessage: 'Kasir berhasil diperbarui',
+            successMessage: includePassword
+                ? 'Kasir diperbarui (termasuk password)'
+                : 'Profil kasir diperbarui',
           ));
         }
       } else {
         emit(CashierError(response.message));
       }
     } catch (e) {
-      emit(CashierError('Gagal memperbarui kasir: ${e.toString()}'));
+      emit(CashierError('Gagal memperbarui kasir: $e'));
     }
   }
 
-  // ✅ DELETE - Hapus cashier via API
+  // DELETE
   Future<void> _onDeleteCashier(
       DeleteCashier event,
       Emitter<CashierState> emit,
       ) async {
     emit(CashierLoading());
     try {
-      final response = await _cashierRepository.deleteCashier(event.cashierId);
+      final response =
+      await _cashierRepository.deleteCashier(event.cashierId);
 
       if (response.success) {
-        // ✅ Refresh dulu
-        final refreshResponse = await _cashierRepository.getCashiers(limit: 100);
+        final refreshResponse =
+        await _cashierRepository.getCashiers(limit: 100);
 
         if (refreshResponse.success && refreshResponse.data != null) {
-          final cashiers = refreshResponse.data!['cashiers'] as List<Cashier>;
+          final cashiers =
+          refreshResponse.data!['cashiers'] as List<Cashier>;
           final pagination = {
             'current_page': refreshResponse.data!['current_page'],
             'last_page': refreshResponse.data!['last_page'],
@@ -193,16 +201,15 @@ class CashierBloc extends Bloc<CashierEvent, CashierState> {
         emit(CashierError(response.message));
       }
     } catch (e) {
-      emit(CashierError('Gagal menghapus kasir: ${e.toString()}'));
+      emit(CashierError('Gagal menghapus kasir: $e'));
     }
   }
 
-  // ✅ SEARCH - Trigger fetch dengan query (hit API)
+  // SEARCH
   Future<void> _onSearchCashier(
       SearchCashier event,
       Emitter<CashierState> emit,
       ) async {
-    // Trigger fetch dengan search query
     add(FetchCashiers(searchQuery: event.query));
   }
 }
