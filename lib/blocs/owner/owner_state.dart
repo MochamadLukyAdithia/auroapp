@@ -36,7 +36,15 @@ class ProfileUpdated extends ProfileState {
   List<Object?> get props => [owner, message];
 }
 
-// Error states
+class PasswordChanged extends ProfileState {
+  final String message;
+
+  const PasswordChanged(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class ProfileError extends ProfileState {
   final String message;
   final int? code;
