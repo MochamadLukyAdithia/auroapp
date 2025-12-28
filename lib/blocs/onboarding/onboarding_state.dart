@@ -56,10 +56,10 @@ class OnboardingState {
 
   bool get isValid {
     return storeName.isNotEmpty &&
-        storeAddress.isNotEmpty &&
-        storePhone.isNotEmpty &&
         storeNameError == null &&
+        storeAddress.isNotEmpty &&
         storeAddressError == null &&
+        storePhone.isNotEmpty &&
         storePhoneError == null;
   }
 }
