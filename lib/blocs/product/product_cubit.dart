@@ -118,9 +118,9 @@ class ProductSearchCubit extends Cubit<ProductSearchState> {
           case StockFilterType.empty:
             return stock == 0;
           case StockFilterType.low:
-            return stock > 0 && stock <= 10;
+            return stock! > 0 && stock <= 5;
           case StockFilterType.available:
-            return stock > 10;
+            return stock! > 5;
           case StockFilterType.all:
           default:
             return true;
@@ -149,10 +149,19 @@ class ProductSearchCubit extends Cubit<ProductSearchState> {
         filtered.sort((a, b) => b.sellingPrice.compareTo(a.sellingPrice));
         break;
       case SortType.stockAsc:
-        filtered.sort((a, b) => a.productStock.compareTo(b.productStock));
+        filtered.sort((a, b) {
+          final stockA = a.productStock ?? 0;
+          final stockB = b.productStock ?? 0;
+          return stockA.compareTo(stockB);
+        });
         break;
+
       case SortType.stockDesc:
-        filtered.sort((a, b) => b.productStock.compareTo(a.productStock));
+        filtered.sort((a, b) {
+          final stockA = a.productStock ?? 0;
+          final stockB = b.productStock ?? 0;
+          return stockB.compareTo(stockA);
+        });
         break;
       case SortType.newest:
         filtered.sort((a, b) {

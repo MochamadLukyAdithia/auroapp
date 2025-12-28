@@ -142,18 +142,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         categoryId: event.categoryId,
       );
 
-
-      // ✅ Kirim ke API
       final response = await _productRepository.createProduct(
         newProduct.toCreateJson(),
-        event.photoFile, // File? dari image_picker
+        event.photoFile,
       );
-
 
       if (response.success) {
         emit(const ProductActionSuccess(message: 'Produk berhasil ditambahkan'));
-
-        // ✅ Reload products dari API
         add(const LoadProducts());
       } else {
         emit(ProductError(message: response.message));
@@ -180,7 +175,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         return;
       }
 
-      if (event.product.costPrice <= 0) {
+      if (event.product.costPrice! <= 0) {
         emit(const ProductError(message: 'Harga dasar harus lebih dari 0'));
         return;
       }
@@ -212,7 +207,6 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     }
   }
 
-  // ✅ DELETE PRODUCT via API
   Future<void> _onDeleteProduct(
       DeleteProduct event,
       Emitter<ProductState> emit,
@@ -224,15 +218,35 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
       if (response.success) {
         emit(const ProductActionSuccess(message: 'Produk berhasil dihapus'));
-
-        // ✅ Reload products
         add(const LoadProducts());
       } else {
-        emit(ProductError(message: response.message));
+        if (_isTransactionError(response.message)) {
+          emit(ProductCannotDelete(message: response.message));
+        } else {
+          emit(ProductError(message: response.message));
+        }
       }
     } catch (e) {
-      emit(ProductError(message: 'Gagal menghapus produk: ${e.toString()}'));
+      final errorMessage = e.toString();
+      if (_isTransactionError(errorMessage)) {
+        emit(const ProductCannotDelete(
+          message: 'Produk ini tidak dapat dihapus karena sudah memiliki riwayat transaksi.',
+        ));
+      } else {
+        emit(ProductError(message: 'Gagal menghapus produk: $errorMessage'));
+      }
     }
+  }
+
+// 🆕 Helper method untuk detect error transaksi
+  bool _isTransactionError(String message) {
+    final lowerMessage = message.toLowerCase();
+    return lowerMessage.contains('transaksi') ||
+        lowerMessage.contains('transaction') ||
+        lowerMessage.contains('telah digunakan') ||
+        lowerMessage.contains('sudah digunakan') ||
+        lowerMessage.contains('cannot be deleted') ||
+        lowerMessage.contains('has been used');
   }
 
   // ✅ FILTER BY CATEGORY (Local filter dari data yang sudah di-load)

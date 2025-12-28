@@ -96,4 +96,10 @@ class FilterProductsByCategory extends ProductEvent {
   List<Object?> get props => [categoryId];
 }
 
-// ❌ HAPUS UpdateProductStock event (stock di-manage backend via history)
+class CheckProductDeletable extends ProductEvent {
+  final int productId;
+  const CheckProductDeletable(this.productId);
+
+  @override
+  List<Object?> get props => [productId];
+}

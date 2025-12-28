@@ -106,3 +106,13 @@ class ProductActionSuccess extends ProductState {
   List<Object?> get props => [message];
 }
 
+
+class ProductCannotDelete extends ProductState {
+  final String message;
+
+  const ProductCannotDelete({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
