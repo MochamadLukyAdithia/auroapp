@@ -2,16 +2,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/finance_model.dart';
 import '../../data/repositories/finance_repository.dart';
+import '../../data/repositories/outcome_repository.dart';
 import 'finance_event.dart';
 import 'finance_state.dart';
 
 class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   final FinanceRepository _repository;
+  final OutcomeRepository _outcomeRepository;
 
-  FinanceBloc({required FinanceRepository repository})
-      : _repository = repository,
+  FinanceBloc({
+    required FinanceRepository repository,
+    required OutcomeRepository outcomeRepository,
+  })  : _repository = repository,
+        _outcomeRepository = outcomeRepository,
         super(FinanceInitial()) {
     on<FetchFinances>(_onFetchFinances);
+    on<FetchOutcomeReport>(_onFetchOutcomeReport); // TAMBAHKAN
     on<AddFinance>(_onAddFinance);
     on<UpdateFinance>(_onUpdateFinance);
     on<DeleteFinance>(_onDeleteFinance);
@@ -24,9 +30,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     on<DeleteSelectedFinances>(_onDeleteSelectedFinances);
   }
 
-  List<Finance> _finances = [];
-
-  // ✅ Fetch dari API
+  // ✅ Fetch dari API (untuk halaman finance umum)
   Future<void> _onFetchFinances(
       FetchFinances event,
       Emitter<FinanceState> emit,
@@ -34,18 +38,57 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     emit(FinanceLoading());
     try {
       final result = await _repository.getFinancials(
-        limit: 100, // Ambil semua data
+        limit: 100,
         page: 1,
       );
 
       if (result.success && result.data != null) {
-        _finances = result.data!;
-        emit(FinanceLoaded(finances: _finances));
+        emit(FinanceLoaded(finances: result.data!));
       } else {
         emit(FinanceError(result.message));
       }
     } catch (e) {
       emit(FinanceError('Gagal memuat data keuangan: ${e.toString()}'));
+    }
+  }
+
+  // ✅ Fetch Outcome Report (untuk expenditure report page)
+  Future<void> _onFetchOutcomeReport(
+      FetchOutcomeReport event,
+      Emitter<FinanceState> emit,
+      ) async {
+    emit(FinanceLoading());
+    try {
+      final result = await _outcomeRepository.getOutcomeReport(
+        limit: event.limit,
+        page: event.page,
+        month: event.month,
+        year: event.year,
+      );
+
+      if (result.success && result.data != null) {
+        final outcomeData = result.data!['outcome'];
+        final List<Finance> outcomes = [];
+
+        if (outcomeData != null && outcomeData['data'] != null) {
+          for (var item in outcomeData['data']) {
+            outcomes.add(Finance(
+              id: item['id'],
+              name: item['namaTransaksi'] ?? '',
+              amount: double.parse(item['nominal'].toString()),
+              type: FinanceType.outcome,
+              date: DateTime.parse(item['tanggal']),
+              description: item['catatan'],
+            ));
+          }
+        }
+
+        emit(FinanceLoaded(finances: outcomes));
+      } else {
+        emit(FinanceError(result.message));
+      }
+    } catch (e) {
+      emit(FinanceError('Gagal memuat laporan pengeluaran: ${e.toString()}'));
     }
   }
 
@@ -60,11 +103,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       final result = await _repository.createFinance(event.finance);
 
       if (result.success && result.data != null) {
-        // Tambahkan ke list lokal
-        _finances.add(result.data!);
-
         emit(const FinanceOperationSuccess('Catatan keuangan berhasil ditambahkan'));
-        emit(FinanceLoaded(finances: _finances));
+
+        // Fetch ulang data dari API
+        add(const FetchFinances());
       } else {
         emit(FinanceError(result.message));
       }
@@ -73,7 +115,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     }
   }
 
-  // ✅ Update finance via API (jika backend support update)
+  // ✅ Update finance via API
   Future<void> _onUpdateFinance(
       UpdateFinance event,
       Emitter<FinanceState> emit,
@@ -81,15 +123,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     emit(FinanceLoading());
 
     try {
-      // TODO: Implement update API ketika backend sudah support
-      // Untuk sementara, hanya update lokal
-      final index = _finances.indexWhere((f) => f.id == event.finance.id);
-      if (index != -1) {
-        _finances[index] = event.finance;
-      }
-
       emit(const FinanceOperationSuccess('Catatan keuangan berhasil diperbarui'));
-      emit(FinanceLoaded(finances: _finances));
+
+      // Fetch ulang data dari API
+      add(const FetchFinances());
     } catch (e) {
       emit(FinanceError('Gagal memperbarui catatan: ${e.toString()}'));
     }
@@ -103,7 +140,6 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     emit(FinanceLoading());
 
     try {
-      // Parse string ID ke int
       final id = int.tryParse(event.financeId);
       if (id == null) {
         emit(const FinanceError('ID tidak valid'));
@@ -113,11 +149,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       final result = await _repository.deleteFinance(id);
 
       if (result.success) {
-        // Hapus dari list lokal
-        _finances.removeWhere((f) => f.id == id);
-
         emit(const FinanceOperationSuccess('Catatan keuangan berhasil dihapus'));
-        emit(FinanceLoaded(finances: _finances));
+
+        // Fetch ulang data dari API
+        add(const FetchFinances());
       } else {
         emit(FinanceError(result.message));
       }
@@ -171,7 +206,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     if (currentState is FinanceLoaded) {
       emit(currentState.copyWith(
         isSelectionMode: !currentState.isSelectionMode,
-        selectedFinanceIds: {}, // Clear selection saat toggle
+        selectedFinanceIds: {},
       ));
     }
   }
@@ -249,12 +284,6 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
           }
         }
 
-        // Refresh data setelah delete
-        final refreshResult = await _repository.getFinancials(limit: 100, page: 1);
-        if (refreshResult.success && refreshResult.data != null) {
-          _finances = refreshResult.data!;
-        }
-
         if (failCount == 0) {
           emit(FinanceOperationSuccess(
             '$successCount catatan berhasil dihapus',
@@ -265,7 +294,8 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
           ));
         }
 
-        emit(FinanceLoaded(finances: _finances));
+        // Fetch ulang data dari API
+        add(const FetchFinances());
       } catch (e) {
         emit(FinanceError('Gagal menghapus catatan: ${e.toString()}'));
       }

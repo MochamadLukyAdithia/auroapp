@@ -90,3 +90,20 @@ class ClearSelection extends FinanceEvent {
 class DeleteSelectedFinances extends FinanceEvent {
   const DeleteSelectedFinances();
 }
+
+class FetchOutcomeReport extends FinanceEvent {
+  final int? month;
+  final int? year;
+  final int limit;
+  final int page;
+
+  const FetchOutcomeReport({
+    this.month,
+    this.year,
+    this.limit = 100,
+    this.page = 1,
+  });
+
+  @override
+  List<Object?> get props => [month, year, limit, page];
+}
