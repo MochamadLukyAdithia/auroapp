@@ -11,12 +11,12 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
       : _repository = repository ?? CustomerRepository(),
         super(CustomerInitial()) {
     on<FetchCustomers>(_onFetchCustomers);
+    on<FetchCustomerById>(_onFetchCustomerById);
     on<AddCustomer>(_onAddCustomer);
     on<UpdateCustomer>(_onUpdateCustomer);
     on<DeleteCustomer>(_onDeleteCustomer);
     on<SearchCustomer>(_onSearchCustomer);
   }
-
 
   Future<void> _onFetchCustomers(
       FetchCustomers event,
@@ -27,7 +27,7 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
     try {
       final result = await _repository.getCustomers(
         page: event.page ?? 1,
-        limit: event.limit,
+        limit: event.limit, // Tanpa default limit - ambil semua
         search: event.searchQuery,
       );
 
@@ -52,6 +52,25 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
     }
   }
 
+  Future<void> _onFetchCustomerById(
+      FetchCustomerById event,
+      Emitter<CustomerState> emit,
+      ) async {
+    emit(CustomerLoading());
+
+    try {
+      final result = await _repository.getCustomer(event.customerId);
+
+      if (result.success && result.data != null) {
+        emit(CustomerDetailLoaded(result.data!));
+      } else {
+        emit(CustomerError(result.message));
+      }
+    } catch (e) {
+      emit(CustomerError('Gagal memuat detail pelanggan: ${e.toString()}'));
+    }
+  }
+
   Future<void> _onAddCustomer(
       AddCustomer event,
       Emitter<CustomerState> emit,
@@ -67,8 +86,16 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
           customer: result.data,
         ));
 
-        // Refresh customer list
-        add(const FetchCustomers());
+        // Refresh customer list dengan search query yang ada
+        final currentSearch = state is CustomerLoaded
+            ? (state as CustomerLoaded).searchQuery
+            : null;
+
+        add(FetchCustomers(
+          page: 1,
+          limit: 20,
+          searchQuery: currentSearch,
+        ));
       } else {
         emit(CustomerError(result.message));
 
@@ -76,12 +103,12 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
         if (state is CustomerLoaded) {
           emit(state as CustomerLoaded);
         } else {
-          add(const FetchCustomers());
+          add(const FetchCustomers(page: 1, limit: 20));
         }
       }
     } catch (e) {
       emit(CustomerError('Gagal menambahkan pelanggan: ${e.toString()}'));
-      add(const FetchCustomers());
+      add(const FetchCustomers(page: 1, limit: 20));
     }
   }
 
@@ -100,8 +127,16 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
           customer: result.data,
         ));
 
-        // Refresh customer list
-        add(const FetchCustomers());
+        // Refresh customer list dengan search query yang ada
+        final currentSearch = state is CustomerLoaded
+            ? (state as CustomerLoaded).searchQuery
+            : null;
+
+        add(FetchCustomers(
+          page: 1,
+          limit: 20,
+          searchQuery: currentSearch,
+        ));
       } else {
         emit(CustomerError(result.message));
 
@@ -109,12 +144,12 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
         if (state is CustomerLoaded) {
           emit(state as CustomerLoaded);
         } else {
-          add(const FetchCustomers());
+          add(const FetchCustomers(page: 1, limit: 20));
         }
       }
     } catch (e) {
       emit(CustomerError('Gagal memperbarui pelanggan: ${e.toString()}'));
-      add(const FetchCustomers());
+      add(const FetchCustomers(page: 1, limit: 20));
     }
   }
 
@@ -130,8 +165,16 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
       if (result.success) {
         emit(CustomerOperationSuccess(result.message));
 
-        // Refresh customer list
-        add(const FetchCustomers());
+        // Refresh customer list dengan search query yang ada
+        final currentSearch = state is CustomerLoaded
+            ? (state as CustomerLoaded).searchQuery
+            : null;
+
+        add(FetchCustomers(
+          page: 1,
+          limit: 20,
+          searchQuery: currentSearch,
+        ));
       } else {
         emit(CustomerError(result.message));
 
@@ -139,12 +182,12 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
         if (state is CustomerLoaded) {
           emit(state as CustomerLoaded);
         } else {
-          add(const FetchCustomers());
+          add(const FetchCustomers(page: 1, limit: 20));
         }
       }
     } catch (e) {
       emit(CustomerError('Gagal menghapus pelanggan: ${e.toString()}'));
-      add(const FetchCustomers());
+      add(const FetchCustomers(page: 1, limit: 20));
     }
   }
 
@@ -152,7 +195,11 @@ class CustomerBloc extends Bloc<CustomerEvent, CustomerState> {
       SearchCustomer event,
       Emitter<CustomerState> emit,
       ) async {
-    // Trigger fetch with search query
-    add(FetchCustomers(searchQuery: event.query));
+    // Langsung fetch dengan query baru
+    add(FetchCustomers(
+      page: 1,
+      limit: 20,
+      searchQuery: event.query.isEmpty ? null : event.query,
+    ));
   }
 }

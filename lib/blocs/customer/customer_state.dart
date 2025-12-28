@@ -70,3 +70,13 @@ class CustomerError extends CustomerState {
   @override
   List<Object> get props => [message];
 }
+
+// Tambah state baru untuk single customer
+class CustomerDetailLoaded extends CustomerState {
+  final Customer customer;
+
+  const CustomerDetailLoaded(this.customer);
+
+  @override
+  List<Object?> get props => [customer];
+}

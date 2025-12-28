@@ -47,7 +47,7 @@ class UpdateCustomer extends CustomerEvent {
 
 // Delete customer
 class DeleteCustomer extends CustomerEvent {
-  final String customerId;
+  final int customerId;
 
   const DeleteCustomer(this.customerId);
 
@@ -68,4 +68,14 @@ class SearchCustomer extends CustomerEvent {
 // Load more customers (for pagination)
 class LoadMoreCustomers extends CustomerEvent {
   const LoadMoreCustomers();
+}
+
+// Tambah event baru
+class FetchCustomerById extends CustomerEvent {
+  final int customerId;
+
+  const FetchCustomerById(this.customerId);
+
+  @override
+  List<Object?> get props => [customerId];
 }
