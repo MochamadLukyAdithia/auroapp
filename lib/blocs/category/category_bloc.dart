@@ -190,7 +190,6 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
       final response = await _categoryRepository.deleteCategory(event.categoryId);
 
       if (response.success) {
-        emit(const CategoryActionSuccess(message: 'Kategori berhasil dihapus'));
         add(const LoadCategories());
       } else {
         emit(CategoryError(message: response.message));
