@@ -1,10 +1,9 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import '../../data/models/transaction_model.dart';
+import '../../data/models/transaction_sales_report_model.dart';
+import '../../data/repositories/transaction_sales_repository.dart';
 
-enum ReportPeriod { today, week, month, year }
+enum ReportPeriod { today, week, month, year, custom }
 
 extension ReportPeriodExtension on ReportPeriod {
   String get displayName {
@@ -17,106 +16,148 @@ extension ReportPeriodExtension on ReportPeriod {
         return 'Bulan Ini';
       case ReportPeriod.year:
         return 'Tahun Ini';
+      case ReportPeriod.custom:
+        return 'Custom';
     }
   }
 }
 
 class SalesReportState extends Equatable {
-  final List<TransactionModel> transactions;
+  final List<TransactionReport> transactions;
+  final TransactionReportSummary? summary;
+  final PaginationMeta? meta;
   final ReportPeriod selectedPeriod;
   final bool isLoading;
+  final String? errorMessage;
   final DateTime? startDate;
   final DateTime? endDate;
-
+  final String searchQuery;
+  final int currentPage;
 
   const SalesReportState({
     this.transactions = const [],
+    this.summary,
+    this.meta,
     this.selectedPeriod = ReportPeriod.today,
     this.isLoading = false,
+    this.errorMessage,
     this.startDate,
-    this.endDate
+    this.endDate,
+    this.searchQuery = '',
+    this.currentPage = 1,
   });
 
-  // Filter transactions berdasarkan periode
-  // Di SalesReportState
-  List<TransactionModel> get filteredTransactions {
-    var result = List<TransactionModel>.from(transactions);
+  // Total penjualan dari summary
+  double get totalSales => summary?.jumlahPendapatan ?? 0;
 
-    // Jika ada custom date range, filter by date
-    if (startDate != null && endDate != null) {
-      result = result.where((t) {
-        return t.transactionDate.isAfter(startDate!.subtract(const Duration(days: 1))) &&
-            t.transactionDate.isBefore(endDate!.add(const Duration(days: 1)));
-      }).toList();
-    } else {
-      // Jika tidak, filter by period
-      final now = DateTime.now();
-      result = result.where((t) {
-        switch (selectedPeriod) {
-          case ReportPeriod.today:
-            return _isSameDay(t.transactionDate, now);
-          case ReportPeriod.week:
-            return t.transactionDate.isAfter(now.subtract(const Duration(days: 7)));
-          case ReportPeriod.month:
-            return t.transactionDate.month == now.month &&
-                t.transactionDate.year == now.year;
-          case ReportPeriod.year:
-            return t.transactionDate.year == now.year;
-        }
-      }).toList();
-    }
+  // Total transaksi dari summary
+  int get totalTransactions => summary?.jumlahTransaksi ?? 0;
 
-    return result..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
-  }
+  // Total keuntungan dari summary
+  double get totalProfit => summary?.jumlahKeuntungan ?? 0;
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  // Total penjualan
-  double get totalSales {
-    return filteredTransactions.fold<double>(
-      0,
-          (sum, t) => sum + t.totalPayment,
-    );
-  }
-
-  // Total transaksi
-  int get totalTransactions => filteredTransactions.length;
-
-  // Total item terjual
-  double get totalItemsSold {
-    return filteredTransactions.fold<double>(
-      0,
-          (sum, t) => sum + t.items.fold<double>(0, (s, item) => s + item.quantity),
-    );
-  }
-
-  // ✅ Total keuntungan
-  double get totalProfit {
-    return filteredTransactions.fold<double>(
-      0,
-          (sum, t) => sum + t.totalProfit,
-    );
-  }
-
-  // ✅ Margin keuntungan (dalam persen)
+  // Margin keuntungan (dalam persen)
   double get profitMargin {
     if (totalSales == 0) return 0;
     return (totalProfit / totalSales) * 100;
   }
 
-  // Data untuk grafik (7 hari terakhir atau sesuai periode)
+  // Total item terjual (dihitung dari transaksi yang ada)
+  double get totalItemsSold {
+    return transactions.fold<double>(
+      0,
+          (sum, t) => sum + 1, // Asumsi 1 transaksi = 1 item, sesuaikan jika ada data quantity
+    );
+  }
+
+  // Data untuk grafik berdasarkan transaksi
   Map<DateTime, double> get chartData {
     final Map<DateTime, double> data = {};
     final now = DateTime.now();
 
-    // ✅ Jika ada custom date range
-    if (startDate != null && endDate != null) {
+    if (selectedPeriod == ReportPeriod.today) {
+      // Per jam untuk hari ini
+      for (int i = 0; i < 24; i++) {
+        final hour = DateTime(now.year, now.month, now.day, i);
+        data[hour] = 0;
+      }
+
+      for (var transaction in transactions) {
+        try {
+          final transDate = DateTime.parse(transaction.tanggal);
+          final hour = DateTime(
+            transDate.year,
+            transDate.month,
+            transDate.day,
+            transDate.hour,
+          );
+          data[hour] = (data[hour] ?? 0) + transaction.totalPenjualan;
+        } catch (e) {
+          // Skip invalid date
+        }
+      }
+    } else if (selectedPeriod == ReportPeriod.week) {
+      // 7 hari terakhir
+      for (int i = 6; i >= 0; i--) {
+        final date = now.subtract(Duration(days: i));
+        final day = DateTime(date.year, date.month, date.day);
+        data[day] = 0;
+      }
+
+      for (var transaction in transactions) {
+        try {
+          final transDate = DateTime.parse(transaction.tanggal);
+          final day = DateTime(transDate.year, transDate.month, transDate.day);
+          if (data.containsKey(day)) {
+            data[day] = (data[day] ?? 0) + transaction.totalPenjualan;
+          }
+        } catch (e) {
+          // Skip invalid date
+        }
+      }
+    } else if (selectedPeriod == ReportPeriod.month) {
+      // Hari dalam bulan ini
+      final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+      for (int i = 1; i <= daysInMonth; i++) {
+        final day = DateTime(now.year, now.month, i);
+        data[day] = 0;
+      }
+
+      for (var transaction in transactions) {
+        try {
+          final transDate = DateTime.parse(transaction.tanggal);
+          final day = DateTime(transDate.year, transDate.month, transDate.day);
+          if (data.containsKey(day)) {
+            data[day] = (data[day] ?? 0) + transaction.totalPenjualan;
+          }
+        } catch (e) {
+          // Skip invalid date
+        }
+      }
+    } else if (selectedPeriod == ReportPeriod.year) {
+      // Per bulan dalam tahun ini
+      for (int i = 1; i <= 12; i++) {
+        final month = DateTime(now.year, i, 1);
+        data[month] = 0;
+      }
+
+      for (var transaction in transactions) {
+        try {
+          final transDate = DateTime.parse(transaction.tanggal);
+          final month = DateTime(transDate.year, transDate.month, 1);
+          if (data.containsKey(month)) {
+            data[month] = (data[month] ?? 0) + transaction.totalPenjualan;
+          }
+        } catch (e) {
+          // Skip invalid date
+        }
+      }
+    } else if (selectedPeriod == ReportPeriod.custom && startDate != null && endDate != null) {
+      // Custom date range
       final daysDiff = endDate!.difference(startDate!).inDays;
 
-      // Kalau lebih dari 31 hari, tampilkan per bulan
       if (daysDiff > 31) {
+        // Per bulan
         DateTime current = DateTime(startDate!.year, startDate!.month, 1);
         final end = DateTime(endDate!.year, endDate!.month, 1);
 
@@ -125,17 +166,19 @@ class SalesReportState extends Equatable {
           current = DateTime(current.year, current.month + 1, 1);
         }
 
-        for (var transaction in filteredTransactions) {
-          final month = DateTime(
-              transaction.transactionDate.year,
-              transaction.transactionDate.month,
-              1
-          );
-          data[month] = (data[month] ?? 0) + transaction.totalPayment;
+        for (var transaction in transactions) {
+          try {
+            final transDate = DateTime.parse(transaction.tanggal);
+            final month = DateTime(transDate.year, transDate.month, 1);
+            if (data.containsKey(month)) {
+              data[month] = (data[month] ?? 0) + transaction.totalPenjualan;
+            }
+          } catch (e) {
+            // Skip invalid date
+          }
         }
-      }
-      // Kalau 31 hari atau kurang, tampilkan per hari
-      else {
+      } else {
+        // Per hari
         for (int i = 0; i <= daysDiff; i++) {
           final day = DateTime(
             startDate!.year,
@@ -145,84 +188,17 @@ class SalesReportState extends Equatable {
           data[day] = 0;
         }
 
-        for (var transaction in filteredTransactions) {
-          final day = DateTime(
-            transaction.transactionDate.year,
-            transaction.transactionDate.month,
-            transaction.transactionDate.day,
-          );
-          if (data.containsKey(day)) {
-            data[day] = (data[day] ?? 0) + transaction.totalPayment;
+        for (var transaction in transactions) {
+          try {
+            final transDate = DateTime.parse(transaction.tanggal);
+            final day = DateTime(transDate.year, transDate.month, transDate.day);
+            if (data.containsKey(day)) {
+              data[day] = (data[day] ?? 0) + transaction.totalPenjualan;
+            }
+          } catch (e) {
+            // Skip invalid date
           }
         }
-      }
-
-      return data;
-    }
-
-    // ✅ Filter by period (existing code)
-    if (selectedPeriod == ReportPeriod.today) {
-      // Per jam untuk hari ini
-      for (int i = 0; i < 24; i++) {
-        final hour = DateTime(now.year, now.month, now.day, i);
-        data[hour] = 0;
-      }
-
-      for (var transaction in filteredTransactions) {
-        final hour = DateTime(
-          transaction.transactionDate.year,
-          transaction.transactionDate.month,
-          transaction.transactionDate.day,
-          transaction.transactionDate.hour,
-        );
-        data[hour] = (data[hour] ?? 0) + transaction.totalPayment;
-      }
-    } else if (selectedPeriod == ReportPeriod.week) {
-      // ... existing code week
-      for (int i = 6; i >= 0; i--) {
-        final date = now.subtract(Duration(days: i));
-        final day = DateTime(date.year, date.month, date.day);
-        data[day] = 0;
-      }
-
-      for (var transaction in filteredTransactions) {
-        final day = DateTime(
-          transaction.transactionDate.year,
-          transaction.transactionDate.month,
-          transaction.transactionDate.day,
-        );
-        data[day] = (data[day] ?? 0) + transaction.totalPayment;
-      }
-    } else if (selectedPeriod == ReportPeriod.month) {
-      // ... existing code month
-      final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-      for (int i = 1; i <= daysInMonth; i++) {
-        final day = DateTime(now.year, now.month, i);
-        data[day] = 0;
-      }
-
-      for (var transaction in filteredTransactions) {
-        final day = DateTime(
-          transaction.transactionDate.year,
-          transaction.transactionDate.month,
-          transaction.transactionDate.day,
-        );
-        data[day] = (data[day] ?? 0) + transaction.totalPayment;
-      }
-    } else {
-      // ... existing code year
-      for (int i = 1; i <= 12; i++) {
-        final month = DateTime(now.year, i, 1);
-        data[month] = 0;
-      }
-
-      for (var transaction in filteredTransactions) {
-        final month = DateTime(
-            transaction.transactionDate.year,
-            transaction.transactionDate.month,
-            1
-        );
-        data[month] = (data[month] ?? 0) + transaction.totalPayment;
       }
     }
 
@@ -230,64 +206,281 @@ class SalesReportState extends Equatable {
   }
 
   SalesReportState copyWith({
-    List<TransactionModel>? transactions,
+    List<TransactionReport>? transactions,
+    TransactionReportSummary? summary,
+    PaginationMeta? meta,
     ReportPeriod? selectedPeriod,
     bool? isLoading,
+    String? errorMessage,
     DateTime? startDate,
     DateTime? endDate,
+    String? searchQuery,
+    int? currentPage,
     bool clearDates = false,
+    bool clearError = false,
   }) {
     return SalesReportState(
       transactions: transactions ?? this.transactions,
+      summary: summary ?? this.summary,
+      meta: meta ?? this.meta,
       selectedPeriod: selectedPeriod ?? this.selectedPeriod,
       isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       startDate: clearDates ? null : (startDate ?? this.startDate),
       endDate: clearDates ? null : (endDate ?? this.endDate),
+      searchQuery: searchQuery ?? this.searchQuery,
+      currentPage: currentPage ?? this.currentPage,
     );
   }
 
   @override
-  List<Object?> get props => [transactions, selectedPeriod, isLoading, startDate, endDate];
+  List<Object?> get props => [
+    transactions,
+    summary,
+    meta,
+    selectedPeriod,
+    isLoading,
+    errorMessage,
+    startDate,
+    endDate,
+    searchQuery,
+    currentPage,
+  ];
 }
 
 class SalesReportCubit extends Cubit<SalesReportState> {
-  SalesReportCubit() : super(const SalesReportState());
+  final TransactionReportRepository _repository;
 
-  Future<void> loadTransactions() async {
-    emit(state.copyWith(isLoading: true));
+  SalesReportCubit(this._repository) : super(const SalesReportState());
+
+  /// Load transactions dari API (untuk admin/owner)
+  Future<void> loadTransactions({
+    int? page,
+    int limit = 999999999,
+  }) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedTransactions = prefs.getStringList('transactions') ?? [];
+      // Tentukan date range berdasarkan period
+      String? startDate;
+      String? endDate;
 
-      final transactions = savedTransactions
-          .map((json) => TransactionModel.fromJson(jsonDecode(json)))
-          .toList();
+      if (state.selectedPeriod != ReportPeriod.custom) {
+        final dates = _getDateRangeFromPeriod(state.selectedPeriod);
+        startDate = dates['start'];
+        endDate = dates['end'];
+      } else if (state.startDate != null && state.endDate != null) {
+        startDate = _formatDate(state.startDate!);
+        endDate = _formatDate(state.endDate!);
+      }
 
-      emit(state.copyWith(
-        transactions: transactions,
-        isLoading: false,
-      ));
+      final response = await _repository.getTransactionReports(
+        limit: limit,
+        page: page ?? state.currentPage,
+        search: state.searchQuery.isEmpty ? null : state.searchQuery,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      if (response.success && response.data != null) {
+        emit(state.copyWith(
+          transactions: response.data!.transactions,
+          summary: response.data!.summary,
+          meta: response.data!.meta,
+          currentPage: page ?? state.currentPage,
+          isLoading: false,
+        ));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: response.message,
+        ));
+      }
     } catch (e) {
-      emit(state.copyWith(isLoading: false));
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'Terjadi kesalahan: $e',
+      ));
     }
   }
 
-  void setPeriod(ReportPeriod period) {
-    emit(state.copyWith(selectedPeriod: period));
+  /// ===== NEW METHOD FOR CASHIER =====
+  /// Load cashier transactions (hanya transaksi kasir yang login)
+  Future<void> loadCashierTransactions({
+    int? page,
+    int limit = 999999999,
+  }) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+
+    try {
+      // Tentukan date range berdasarkan period
+      String? startDate;
+      String? endDate;
+
+      if (state.selectedPeriod != ReportPeriod.custom) {
+        final dates = _getDateRangeFromPeriod(state.selectedPeriod);
+        startDate = dates['start'];
+        endDate = dates['end'];
+      } else if (state.startDate != null && state.endDate != null) {
+        startDate = _formatDate(state.startDate!);
+        endDate = _formatDate(state.endDate!);
+      }
+
+      final response = await _repository.getCashierTransactionReports(
+        limit: limit,
+        page: page ?? state.currentPage,
+        search: state.searchQuery.isEmpty ? null : state.searchQuery,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      if (response.success && response.data != null) {
+        emit(state.copyWith(
+          transactions: response.data!.transactions,
+          summary: response.data!.summary,
+          meta: response.data!.meta,
+          currentPage: page ?? state.currentPage,
+          isLoading: false,
+        ));
+      } else {
+        emit(state.copyWith(
+          isLoading: false,
+          errorMessage: response.message,
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'Terjadi kesalahan: $e',
+      ));
+    }
   }
 
-  void setDateRange(DateTime? start, DateTime? end) {
-    if (start == null && end == null) {
-      emit(state.copyWith(clearDates: true));
+  /// Set period dan auto reload
+  Future<void> setPeriod(ReportPeriod period, {bool isCashier = false}) async {
+    emit(state.copyWith(
+      selectedPeriod: period,
+      currentPage: 1,
+      clearDates: period != ReportPeriod.custom,
+    ));
+
+    if (isCashier) {
+      await loadCashierTransactions();
     } else {
-      emit(state.copyWith(startDate: start, endDate: end));
+      await loadTransactions();
     }
   }
 
-  Future<void> clearAllTransactions() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('transactions');
-    emit(state.copyWith(transactions: []));
+  /// Set custom date range
+  Future<void> setDateRange(DateTime? start, DateTime? end, {bool isCashier = false}) async {
+    if (start == null && end == null) {
+      emit(state.copyWith(
+        selectedPeriod: ReportPeriod.today,
+        clearDates: true,
+        currentPage: 1,
+      ));
+    } else {
+      emit(state.copyWith(
+        selectedPeriod: ReportPeriod.custom,
+        startDate: start,
+        endDate: end,
+        currentPage: 1,
+      ));
+    }
+
+    if (isCashier) {
+      await loadCashierTransactions();
+    } else {
+      await loadTransactions();
+    }
+  }
+
+  /// Set search query
+  Future<void> setSearchQuery(String query, {bool isCashier = false}) async {
+    emit(state.copyWith(
+      searchQuery: query,
+      currentPage: 1,
+    ));
+
+    if (isCashier) {
+      await loadCashierTransactions();
+    } else {
+      await loadTransactions();
+    }
+  }
+
+  /// Load next page
+  Future<void> loadNextPage({bool isCashier = false}) async {
+    if (state.meta != null && state.currentPage < state.meta!.lastPage) {
+      if (isCashier) {
+        await loadCashierTransactions(page: state.currentPage + 1);
+      } else {
+        await loadTransactions(page: state.currentPage + 1);
+      }
+    }
+  }
+
+  /// Load previous page
+  Future<void> loadPreviousPage({bool isCashier = false}) async {
+    if (state.currentPage > 1) {
+      if (isCashier) {
+        await loadCashierTransactions(page: state.currentPage - 1);
+      } else {
+        await loadTransactions(page: state.currentPage - 1);
+      }
+    }
+  }
+
+  /// Refresh data
+  Future<void> refresh({bool isCashier = false}) async {
+    emit(state.copyWith(currentPage: 1));
+
+    if (isCashier) {
+      await loadCashierTransactions();
+    } else {
+      await loadTransactions();
+    }
+  }
+
+  /// Helper: Get date range dari period
+  Map<String, String> _getDateRangeFromPeriod(ReportPeriod period) {
+    final now = DateTime.now();
+    DateTime start;
+    DateTime end;
+
+    switch (period) {
+      case ReportPeriod.today:
+        start = DateTime(now.year, now.month, now.day);
+        end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+        break;
+
+      case ReportPeriod.week:
+        start = now.subtract(const Duration(days: 7));
+        end = now;
+        break;
+
+      case ReportPeriod.month:
+        start = DateTime(now.year, now.month, 1);
+        end = DateTime(now.year, now.month + 1, 0);
+        break;
+
+      case ReportPeriod.year:
+        start = DateTime(now.year, 1, 1);
+        end = DateTime(now.year, 12, 31);
+        break;
+
+      case ReportPeriod.custom:
+        return {};
+    }
+
+    return {
+      'start': _formatDate(start),
+      'end': _formatDate(end),
+    };
+  }
+
+  /// Helper: Format date ke YYYY-MM-DD
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 }
