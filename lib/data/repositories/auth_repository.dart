@@ -17,27 +17,37 @@ class AuthRepository {
         '/login',
         data: request.toJson(),
       );
-
       final loginResponse = LoginResponse.fromJson(response.data);
-
-      // Simpan token jika berhasil
-      if (loginResponse.success && loginResponse.data != null) {
-        await _saveToken(loginResponse.data!.accessToken);
+      if (loginResponse.success &&
+          loginResponse.data != null &&
+          loginResponse.data!.isFullLogin) {
+        await _saveToken(loginResponse.data!.accessToken!);
         await _saveUserData(loginResponse.data!);
       }
 
       return loginResponse;
+
     } on DioException catch (e) {
-      if (e.response != null) {
-        return LoginResponse.fromJson(e.response!.data);
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        throw Exception('Network error: Tidak dapat terhubung ke server');
       }
+
+      if (e.response != null) {
+        final loginResponse = LoginResponse.fromJson(e.response!.data);
+
+        return loginResponse;
+      }
+
       throw Exception('Network error: ${e.message}');
+
     } catch (e) {
       throw Exception('Unexpected error: $e');
     }
   }
 
-  // Tambahkan method ini
   Future<VerifyOtpResponse> verifyOtp({
     required int userId,
     required String otpCode,
@@ -59,7 +69,6 @@ class AuthRepository {
     }
   }
 
-// Update method resendOtp lewat register
   Future<ResendOtpResponse> resendOtpFromRegister(int userId) async {
     try {
       final response = await _dio.post(
@@ -75,12 +84,11 @@ class AuthRepository {
     }
   }
 
-  // resendOtp lewat login
   Future<ResendOtpResponse> resendOtp({required String email}) async {
     try {
       final response = await _dio.post(
         '/resend-otp',
-        data: {'email': email}, // ✅ Hanya kirim email
+        data: {'email': email},
       );
 
       return ResendOtpResponse.fromJson(response.data);
@@ -92,36 +100,15 @@ class AuthRepository {
     }
   }
 
-  // Register Owner
-  // Future<RegisterResponse> registerOwner(Map<String, dynamic> request) async {
-  //   try {
-  //     final response = await _dio.post(
-  //       '/register-owner',
-  //       data: request, // Kirim Map langsung
-  //     );
-  //     return RegisterResponse.fromJson(response.data);
-  //   } on DioException catch (e) {
-  //     if (e.response != null) {
-  //       return RegisterResponse.fromJson(e.response!.data);
-  //     }
-  //     throw Exception('Network error: ${e.message}');
-  //   }
-  // }
-
   Future<RegisterResponse> registerOwner(Map<String, dynamic> request) async {
     try {
-      print('🚀 Sending request: $request'); // Debug
-
       final response = await _dio.post(
         '/register-owner',
         data: request,
       );
 
-      print('📥 Raw response: ${response.data}'); // Debug
-
       return RegisterResponse.fromJson(response.data);
     } on DioException catch (e) {
-      print('❌ DioException: ${e.response?.data}'); // Debug
 
       if (e.response != null) {
         return RegisterResponse.fromJson(e.response!.data);
@@ -130,12 +117,9 @@ class AuthRepository {
     }
   }
 
-
-  // Logout
   Future<void> logout() async {
     try {
       final token = await getToken();
-
       if (token != null) {
         await _dio.post(
           '/logout',
@@ -144,10 +128,8 @@ class AuthRepository {
           ),
         );
       }
-
       await _clearSession();
     } catch (e) {
-      // Tetap clear session meskipun API gagal
       await _clearSession();
       throw Exception('Logout error: $e');
     }
@@ -188,9 +170,9 @@ class AuthRepository {
 
   Future<void> _saveUserData(LoginData data) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_role', data.role);
-    await prefs.setString('user_email', data.user.email);
-    await prefs.setString('user_name', data.user.fullName);
+    await prefs.setString('user_role', data.role!);
+    await prefs.setString('user_email', data.user!.email);
+    await prefs.setString('user_name', data.user!.fullName);
     await prefs.setBool('is_logged_in', true);
   }
 
@@ -200,6 +182,9 @@ class AuthRepository {
     await prefs.remove('user_role');
     await prefs.remove('user_email');
     await prefs.remove('user_name');
+    await prefs.remove('user_id');
+    await prefs.remove('user_data');
+    await prefs.remove('auth_token');
     await prefs.setBool('is_logged_in', false);
   }
 
