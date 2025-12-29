@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../../blocs/company/company_cubit.dart';
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../../core/utils/responsive_helper.dart';
 import '../../../../../../data/models/company_model.dart';
 import '../../../../../widgets/custom_app_bar.dart';
 import 'dart:io';
@@ -48,7 +49,6 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
       FloatingMessage.show(
         context,
         message: 'Nama toko tidak boleh kosong',
-        textOnly: true,
         backgroundColor: Colors.red,
       );
       return;
@@ -58,7 +58,6 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
       FloatingMessage.show(
         context,
         message: 'Alamat toko tidak boleh kosong',
-        textOnly: true,
         backgroundColor: Colors.red,
       );
       return;
@@ -68,7 +67,6 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
       FloatingMessage.show(
         context,
         message: 'Nomor telephone tidak boleh kosong',
-        textOnly: true,
         backgroundColor: Colors.red,
       );
       return;
@@ -85,6 +83,8 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return Scaffold(
       appBar: const CustomAppBar(title: 'Update Profil Toko'),
       body: BlocConsumer<CompanyCubit, CompanyState>(
@@ -99,7 +99,6 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
             FloatingMessage.show(
               context,
               message: 'Profil toko berhasil disimpan',
-              textOnly: true,
               backgroundColor: primaryGreenColor,
             );
             Navigator.pop(context);
@@ -109,7 +108,6 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
             FloatingMessage.show(
               context,
               message: state.message,
-              textOnly: true,
               backgroundColor: Colors.red,
             );
           }
@@ -118,30 +116,36 @@ class _CompanyPageUpdateState extends State<CompanyPageUpdate> {
           return Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    CompanyLogoSection(
-                      logoUrl: _logoUrl,
-                      logoFile: _logoFile,
-                      onImagePicked: (file) {
-                        setState(() {
-                          _logoFile = file;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    CompanyNameField(controller: _nameController),
-                    const SizedBox(height: 16),
-                    CompanyAddress(controller: _addressController),
-                    const SizedBox(height: 16),
-                    CompanyPhoneNumber(controller: _phoneController),
-                    const SizedBox(height: 16),
-                    SaveButton(
-                      onPressed: _isLoading ? null : _saveCompany,
-                      isLoading: _isLoading,
-                    ),
-                  ],
+                padding: EdgeInsets.all(r.spacing(mobile: 16, tablet: 24)),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: r.isTablet ? 600 : double.infinity,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CompanyLogoSection(
+                        logoUrl: _logoUrl,
+                        logoFile: _logoFile,
+                        onImagePicked: (file) {
+                          setState(() {
+                            _logoFile = file;
+                          });
+                        },
+                      ),
+                      SizedBox(height: r.spacing(mobile: 16, tablet: 24)),
+                      CompanyNameField(controller: _nameController),
+                      SizedBox(height: r.spacing(mobile: 16, tablet: 24)),
+                      CompanyAddress(controller: _addressController),
+                      SizedBox(height: r.spacing(mobile: 16, tablet: 24)),
+                      CompanyPhoneNumber(controller: _phoneController),
+                      SizedBox(height: r.spacing(mobile: 24, tablet: 32)),
+                      SaveButton(
+                        onPressed: _isLoading ? null : _saveCompany,
+                        isLoading: _isLoading,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (_isLoading)
@@ -176,31 +180,33 @@ class CompanyLogoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Profil Toko',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
             fontWeight: FontWeight.w600,
             fontFamily: fontType,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: r.spacing(mobile: 8, tablet: 12)),
         ImagePickerWidget(
           imageUrl: logoUrl,
           imageFile: logoFile,
           onImagePicked: onImagePicked,
-          width: 80,
-          height: 80,
+          width: r.isTablet ? 120 : 80,
+          height: r.isTablet ? 120 : 80,
           uploadText: 'Upload',
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: r.spacing(mobile: 4, tablet: 8)),
         Text(
           'Format gambar .jpg .jpeg .png dan Ukuran file 3MB (Gunakan ukuran minimum 500 x 500 pxl).',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: r.fontSize(mobile: 11, tablet: 13),
             color: Colors.grey[600],
             fontFamily: fontType,
             fontWeight: FontWeight.w300,
@@ -211,7 +217,7 @@ class CompanyLogoSection extends StatelessWidget {
   }
 }
 
-// Nama toko
+// Nama Toko Field
 class CompanyNameField extends StatelessWidget {
   final TextEditingController controller;
 
@@ -219,19 +225,32 @@ class CompanyNameField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Nama Toko',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, fontFamily: fontType),
+          style: TextStyle(
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
+            fontWeight: FontWeight.w600,
+            fontFamily: fontType,
+          ),
         ),
-        const SizedBox(height: 8),
-        TextFormField(
+        SizedBox(height: r.spacing(mobile: 8, tablet: 12)),
+        TextField(
           controller: controller,
+          style: TextStyle(
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
+            fontFamily: fontType,
+          ),
           decoration: InputDecoration(
-            hintText: 'Contoh: Toko Sumber Rejeki',
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14, fontFamily: fontType),
+            hintText: 'Masukkan nama toko',
+            hintStyle: TextStyle(
+              fontSize: r.fontSize(mobile: 14, tablet: 16),
+              color: Colors.grey[400],
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -242,12 +261,12 @@ class CompanyNameField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: primaryGreenColor, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: r.spacing(mobile: 12, tablet: 16),
+              vertical: r.spacing(mobile: 12, tablet: 16),
+            ),
           ),
         ),
       ],
@@ -255,7 +274,7 @@ class CompanyNameField extends StatelessWidget {
   }
 }
 
-// Alamat toko
+// Alamat Toko Field
 class CompanyAddress extends StatelessWidget {
   final TextEditingController controller;
 
@@ -263,36 +282,32 @@ class CompanyAddress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Alamat toko',
+        Text(
+          'Alamat Toko',
           style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            fontFamily: fontType,
           ),
         ),
-        const SizedBox(height: 8),
-        TextFormField(
+        SizedBox(height: r.spacing(mobile: 8, tablet: 12)),
+        TextField(
           controller: controller,
           maxLines: 3,
-          style: const TextStyle(
+          style: TextStyle(
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
             fontFamily: fontType,
-            fontSize: 15,
           ),
           decoration: InputDecoration(
-            hintText: 'Masukan Alamat Toko',
+            hintText: 'Masukkan alamat toko',
             hintStyle: TextStyle(
-              fontFamily: fontType,
+              fontSize: r.fontSize(mobile: 14, tablet: 16),
               color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -304,20 +319,20 @@ class CompanyAddress extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: primaryGreenColor, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: r.spacing(mobile: 12, tablet: 16),
+              vertical: r.spacing(mobile: 12, tablet: 16),
             ),
           ),
-          keyboardType: TextInputType.streetAddress,
         ),
       ],
     );
   }
 }
 
-// Nomor telpon toko
+// Nomor Telepon Field
 class CompanyPhoneNumber extends StatelessWidget {
   final TextEditingController controller;
 
@@ -325,35 +340,32 @@ class CompanyPhoneNumber extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Nomor Handphone Toko',
+        Text(
+          'Nomor Telepon',
           style: TextStyle(
-            fontFamily: fontType,
-            fontSize: 16,
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
             fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            fontFamily: fontType,
           ),
         ),
-        const SizedBox(height: 8),
-        TextFormField(
+        SizedBox(height: r.spacing(mobile: 8, tablet: 12)),
+        TextField(
           controller: controller,
-          style: const TextStyle(
+          keyboardType: TextInputType.phone,
+          style: TextStyle(
+            fontSize: r.fontSize(mobile: 14, tablet: 16),
             fontFamily: fontType,
-            fontSize: 15,
           ),
           decoration: InputDecoration(
-            hintText: 'Masukan Nomor Handphone Toko',
+            hintText: 'Masukkan nomor telepon',
             hintStyle: TextStyle(
-              fontFamily: fontType,
+              fontSize: r.fontSize(mobile: 14, tablet: 16),
               color: Colors.grey[400],
-              fontSize: 14,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -365,19 +377,20 @@ class CompanyPhoneNumber extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(
-                color: primaryGreenColor,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: primaryGreenColor, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: r.spacing(mobile: 12, tablet: 16),
+              vertical: r.spacing(mobile: 12, tablet: 16),
             ),
           ),
-          keyboardType: TextInputType.phone,
         ),
       ],
     );
   }
 }
 
+// Save Button
 class SaveButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
@@ -390,33 +403,37 @@ class SaveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = context.responsive;
+
     return SizedBox(
       width: double.infinity,
-      height: 48,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreenColor,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(
+            vertical: r.spacing(mobile: 14, tablet: 18),
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
-          disabledBackgroundColor: Colors.grey[400],
+          disabledBackgroundColor: Colors.grey[300],
         ),
         child: isLoading
-            ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
+            ? SizedBox(
+          height: r.size(mobile: 20, tablet: 24),
+          width: r.size(mobile: 20, tablet: 24),
+          child: const CircularProgressIndicator(
             color: Colors.white,
             strokeWidth: 2,
           ),
         )
-            : const Text(
+            : Text(
           'Simpan',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: r.fontSize(mobile: 16, tablet: 18),
             fontWeight: FontWeight.w600,
-            color: Colors.white,
             fontFamily: fontType,
           ),
         ),
