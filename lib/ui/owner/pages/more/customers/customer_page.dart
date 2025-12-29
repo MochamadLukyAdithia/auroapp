@@ -1,4 +1,6 @@
 // ui/pages/customer/customer_page.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import 'package:pos_mobile/ui/widgets/floating_message.dart';
@@ -31,29 +33,12 @@ class _CustomerPageState extends State<CustomerPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CustomerBloc>().add(const FetchCustomers(page: 1, limit: 9999));
+      context.read<CustomerBloc>().add(const FetchCustomers());
     });
-
-    _scrollController.addListener(_onScroll);
   }
 
   void _onScroll() {
-    if (_isLoadingMore) return;
-
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.position.pixels;
-    final state = context.read<CustomerBloc>().state;
-
-    if (currentScroll >= maxScroll * 0.8 && state is CustomerLoaded && state.hasMore) {
-      setState(() => _isLoadingMore = true);
-      context.read<CustomerBloc>().add(
-        FetchCustomers(
-          page: state.currentPage + 1,
-          limit: 9999,
-          searchQuery: state.searchQuery,
-        ),
-      );
-    }
+    // Scroll listener dihapus karena tidak pakai pagination
   }
 
   @override
@@ -106,11 +91,7 @@ class _CustomerPageState extends State<CustomerPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CustomerSearchBar(
-                        onSearchChanged: (query) {
-                          context.read<CustomerBloc>().add(SearchCustomer(query));
-                        },
-                      ),
+                      const CustomerSearchBar(),
                       const SizedBox(height: 4),
                       Text(
                         'Total: ${state.total} pelanggan',
@@ -135,8 +116,6 @@ class _CustomerPageState extends State<CustomerPage> {
                     controller: _scrollController,
                     customers: customers,
                     isSelectionMode: widget.isSelectionMode,
-                    hasMore: state.hasMore,
-                    isLoadingMore: _isLoadingMore,
                     onCustomerSelected: widget.isSelectionMode
                         ? (customer) {
                       Navigator.pop(context, customer);
@@ -153,7 +132,17 @@ class _CustomerPageState extends State<CustomerPage> {
                 onPressed: () async {
                   await Navigator.pushNamed(context, AppRoutes.addCustomer);
                   if (mounted) {
-                    context.read<CustomerBloc>().add(const FetchCustomers(page: 1, limit: 9999));
+                    // Refresh dengan search query yang ada
+                    final currentState = context.read<CustomerBloc>().state;
+                    final searchQuery = currentState is CustomerLoaded
+                        ? currentState.searchQuery
+                        : null;
+
+                    context.read<CustomerBloc>().add(
+                      FetchCustomers(
+                        searchQuery: searchQuery,
+                      ),
+                    );
                   }
                 },
                 backgroundColor: primaryGreenColor,
@@ -225,7 +214,7 @@ class EmptyCustomerSection extends StatelessWidget {
               onPressed: () async {
                 await Navigator.pushNamed(context, AppRoutes.addCustomer);
                 if (context.mounted) {
-                  context.read<CustomerBloc>().add(const FetchCustomers(page: 1, limit: 9999));
+                  context.read<CustomerBloc>().add(const FetchCustomers());
                 }
               },
             ),
@@ -236,13 +225,43 @@ class EmptyCustomerSection extends StatelessWidget {
   }
 }
 
-class CustomerSearchBar extends StatelessWidget {
+class CustomerSearchBar extends StatefulWidget {
   final ValueChanged<String>? onSearchChanged;
 
   const CustomerSearchBar({
     super.key,
     this.onSearchChanged,
   });
+
+  @override
+  State<CustomerSearchBar> createState() => _CustomerSearchBarState();
+}
+
+class _CustomerSearchBarState extends State<CustomerSearchBar> {
+  final _controller = TextEditingController();
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sync dengan state yang ada
+    final state = context.read<CustomerBloc>().state;
+    if (state is CustomerLoaded && state.searchQuery != null) {
+      _controller.text = state.searchQuery!;
+    }
+
+    // Listen ke perubahan controller
+    _controller.addListener(() {
+      setState(() {}); // Untuk update suffixIcon
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -259,19 +278,43 @@ class CustomerSearchBar extends StatelessWidget {
         ],
       ),
       child: TextField(
+        controller: _controller,
+        autofocus: false,
+        style: const TextStyle(
+          fontFamily: fontType,
+          color: Colors.black87,
+          fontSize: 14,
+        ),
         onChanged: (value) {
-          context.read<CustomerBloc>().add(SearchCustomer(value));
+
+          if (_debounce?.isActive ?? false) _debounce!.cancel();
+          _debounce = Timer(const Duration(milliseconds: 500), () {
+            if (widget.onSearchChanged != null) {
+              widget.onSearchChanged!(value);
+            } else {
+              context.read<CustomerBloc>().add(SearchCustomer(value));
+            }
+          });
         },
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           hintText: 'Cari pelanggan...',
-          hintStyle: TextStyle(
+          hintStyle: const TextStyle(
             fontFamily: fontType,
             color: Colors.grey,
             fontSize: 14,
           ),
           border: InputBorder.none,
-          prefixIcon: Icon(Icons.search, color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(
+          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+          suffixIcon: _controller.text.isNotEmpty
+              ? IconButton(
+            icon: const Icon(Icons.clear, color: Colors.grey),
+            onPressed: () {
+              _controller.clear();
+              context.read<CustomerBloc>().add(const SearchCustomer(''));
+            },
+          )
+              : null,
+          contentPadding: const EdgeInsets.symmetric(
             vertical: 14,
             horizontal: 16,
           ),
@@ -285,8 +328,6 @@ class CustomerListView extends StatelessWidget {
   final ScrollController controller;
   final List<Customer> customers;
   final bool isSelectionMode;
-  final bool hasMore;
-  final bool isLoadingMore;
   final Function(Customer)? onCustomerSelected;
 
   const CustomerListView({
@@ -294,8 +335,6 @@ class CustomerListView extends StatelessWidget {
     required this.controller,
     required this.customers,
     this.isSelectionMode = false,
-    this.hasMore = false,
-    this.isLoadingMore = false,
     this.onCustomerSelected,
   });
 
@@ -304,19 +343,8 @@ class CustomerListView extends StatelessWidget {
     return ListView.builder(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-      itemCount: customers.length + (hasMore ? 1 : 0),
+      itemCount: customers.length,
       itemBuilder: (context, index) {
-        if (index == customers.length) {
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Center(
-              child: isLoadingMore
-                  ? const CircularProgressIndicator(color: primaryGreenColor)
-                  : const SizedBox(),
-            ),
-          );
-        }
-
         final customer = customers[index];
         return CustomerCard(
           customer: customer,
@@ -491,7 +519,17 @@ class _CustomerCardState extends State<CustomerCard> {
                     );
 
                     if (result != null && context.mounted) {
-                      context.read<CustomerBloc>().add(const FetchCustomers(page: 1, limit: 9999));
+                      // Refresh dengan search query yang ada
+                      final currentState = context.read<CustomerBloc>().state;
+                      final searchQuery = currentState is CustomerLoaded
+                          ? currentState.searchQuery
+                          : null;
+
+                      context.read<CustomerBloc>().add(
+                        FetchCustomers(
+                          searchQuery: searchQuery,
+                        ),
+                      );
                     }
                   },
                   borderRadius: BorderRadius.circular(8),
