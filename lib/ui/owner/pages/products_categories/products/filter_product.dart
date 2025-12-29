@@ -134,13 +134,13 @@ class _ProductFilterPageState extends State<ProductFilterPage> {
                     icon: Icons.apps,
                   ),
                   _buildStockOption(
-                    title: 'Tersedia (>10)',
+                    title: 'Tersedia (>5)',
                     value: StockFilterType.available,
                     icon: Icons.check_circle_outline,
                     color: Colors.green,
                   ),
                   _buildStockOption(
-                    title: 'Menipis (1-10)',
+                    title: 'Menipis (1-5)',
                     value: StockFilterType.low,
                     icon: Icons.warning_amber_outlined,
                     color: Colors.orange,
