@@ -1,4 +1,3 @@
-import 'package:bloc/bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/blocs/transaction/transaction_cubit.dart';
@@ -18,7 +17,14 @@ class DetailTransaction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<TransactionCubit, TransactionState>(
+        listener: (context, state) {
+          // ✅ Auto close jika tidak ada item
+          if (state.selectedItems.isEmpty) {
+            Navigator.pop(context);
+          }
+        },
+    child: Scaffold(
       extendBody: true,
       backgroundColor: Colors.grey.shade50,
       appBar: const CustomAppBar(title: 'Rincian Pembayaran'),
@@ -46,7 +52,7 @@ class DetailTransaction extends StatelessWidget {
                     final stock = product.productStock;
 
                     // Cek jika produk punya tracking stok
-                    if (qty > stock) {
+                    if (qty > stock!) {
                       hasStockIssue = true;
                       errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
                           'Tersedia: $stock, Dipilih: $qty';
@@ -56,7 +62,7 @@ class DetailTransaction extends StatelessWidget {
 
                   // Show error jika ada masalah stok
                   if (hasStockIssue) {
-                    FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                    FloatingMessage.show(context, message: errorMessage, backgroundColor: Colors.red);
                     return;
                   }
                   // Stok valid, lanjut ke payment
@@ -79,7 +85,7 @@ class DetailTransaction extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -209,12 +215,12 @@ class ItemListSection extends StatelessWidget {
           itemBuilder: (context, index) {
             final product = selectedProducts[index];
             final quantity = state.getQuantity(product.id.toString());
-            final isSelected = state.selectedProductIds.contains(product.id);
+            final isSelected = state.selectedProductIds.contains(product.id.toString());
             final isSelectionMode = state.isSelectionMode;
 
             // Existing calculations
-            final hasProductDiscount = product.productDiscount !> 0;
-            final priceAfterDiscount = product.sellingPrice * (1 - product.productDiscount !/ 100);
+            final hasProductDiscount = product.productDiscount > 0;
+            final priceAfterDiscount = product.sellingPrice * (1 - product.productDiscount / 100);
             final totalPrice = priceAfterDiscount * quantity;
             final currentStock = product.productStock ?? 0;
             final isOverStock = product.productStock != null && quantity > currentStock;
@@ -244,20 +250,24 @@ class ItemListSection extends StatelessWidget {
                   ),
                 ),
                 child: ListTile(
-                  // Tambah checkbox di leading kalau selection mode
-                  leading: isSelectionMode
-                      ? Checkbox(
-                    value: isSelected,
-                    onChanged: (_) {
-                      context.read<TransactionCubit>().toggleProductSelection(product.id.toString());
-                    },
-                    activeColor: primaryGreenColor,
-                  )
-                      : null,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: isSelectionMode ? 8 : 16,
-                    vertical: 8,
-                  ),
+                    // ✅ Gunakan conditional yang lebih eksplisit
+                    leading: isSelectionMode
+                        ? Checkbox(
+                      value: isSelected,
+                      onChanged: (_) {
+                        context.read<TransactionCubit>().toggleProductSelection(product.id.toString());
+                      },
+                      activeColor: primaryGreenColor,
+                    )
+                        : null, // ✅ Gunakan null, bukan SizedBox
+
+                    // ✅ PENTING: Tambahkan key agar Flutter tau ini widget berbeda
+                    key: ValueKey('product_${product.id}_$isSelectionMode'),
+
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isSelectionMode ? 8 : 16,
+                      vertical: 8,
+                    ),
                   // ... rest of ListTile content (title, subtitle, trailing) tetap sama
                   title: Row(
                     children: [
@@ -336,7 +346,7 @@ class ItemListSection extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    'Diskon ${product.productDiscount?.toInt()}%',
+                                    'Diskon ${product.productDiscount.toInt()}%',
                                     style: TextStyle(
                                       fontFamily: fontType,
                                       fontSize: 10,
@@ -597,7 +607,6 @@ class BottomActionButtons extends StatelessWidget {
               FloatingMessage.show(
                 context,
                 message: '$count item berhasil dihapus',
-                textOnly: true,
                 backgroundColor: primaryGreenColor,
               );
             },
@@ -720,6 +729,7 @@ class BottomActionButtons extends StatelessWidget {
     );
   }
 }
+
 
 class DiscountBottomSheet extends StatefulWidget {
   const DiscountBottomSheet({super.key});
