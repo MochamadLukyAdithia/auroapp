@@ -8,10 +8,13 @@ import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import 'package:pos_mobile/ui/widgets/floating_message.dart';
 import '../../../../../blocs/history_stock/stock_bloc.dart';
+import '../../../../../blocs/payment_method/payment_method_cubit.dart';
+import '../../../../../blocs/payment_method/payment_method_state.dart';
+import '../../../../../blocs/product/product_bloc.dart';
 import '../../../../../blocs/transaction/transaction_cubit.dart';
 import '../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../core/theme/theme.dart';
-import '../../../../../route/route.dart';
+import '../../../../../data/models/payment_method_model.dart' as pm;
 
 class DetailPayment extends StatelessWidget {
   const DetailPayment({super.key});
@@ -53,26 +56,51 @@ class PaymentOptionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final payments = [
-      {'icon': Icons.attach_money_rounded, 'label': 'Tunai'},
-      {'icon': Icons.qr_code_2_rounded, 'label': 'QRIS'},
-      {'icon': Icons.account_balance_rounded, 'label': 'Bank Transfer'},
-      {'icon': Icons.credit_card_rounded, 'label': 'E-Wallet'},
-    ];
+    return BlocBuilder<PaymentMethodCubit, PaymentMethodState>(
+      builder: (context, paymentState) {
+        // ✅ Check apakah ada payment method yang aktif per kategori
+        final hasActiveQRIS = paymentState is PaymentMethodLoaded &&
+            paymentState.qrisMethods.any((p) => p.isEnabled);
 
-    return Column(
-      children: payments
-          .map((p) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: PaymentOptionItem(
-          icon: p['icon'] as IconData,
-          label: p['label'] as String,
-          onTap: () {
-            _navigateToPayment(context, p['label'] as String);
-          },
-        ),
-      ))
-          .toList(),
+        final hasActiveEwallet = paymentState is PaymentMethodLoaded &&
+            paymentState.ewalletMethods.any((p) => p.isEnabled);
+
+        final hasActiveBank = paymentState is PaymentMethodLoaded &&
+            paymentState.bankMethods.any((p) => p.isEnabled);
+
+        // ✅ Build payment options list secara dinamis
+        final payments = <Map<String, dynamic>>[
+          // Cash selalu ada
+          {'icon': Icons.attach_money_rounded, 'label': 'Tunai'},
+
+          // QRIS muncul kalau ada yang aktif
+          if (hasActiveQRIS)
+            {'icon': Icons.qr_code_2_rounded, 'label': 'QRIS'},
+
+          // Bank Transfer muncul kalau ada yang aktif
+          if (hasActiveBank)
+            {'icon': Icons.account_balance_rounded, 'label': 'Bank Transfer'},
+
+          // E-Wallet muncul kalau ada yang aktif
+          if (hasActiveEwallet)
+            {'icon': Icons.credit_card_rounded, 'label': 'E-Wallet'},
+        ];
+
+        return Column(
+          children: payments
+              .map((p) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: PaymentOptionItem(
+              icon: p['icon'] as IconData,
+              label: p['label'] as String,
+              onTap: () {
+                _navigateToPayment(context, p['label'] as String);
+              },
+            ),
+          ))
+              .toList(),
+        );
+      },
     );
   }
 
@@ -81,8 +109,9 @@ class PaymentOptionList extends StatelessWidget {
 
     switch (label) {
       case 'Tunai':
-      // Set payment method dulu
-        transactionCubit.setPaymentMethod(PaymentMethod.cash);
+        final cashMethod = transactionCubit.state.availablePaymentMethods
+            .firstWhere((method) => method.type == pm.PaymentType.cash);
+        transactionCubit.setPaymentMethod(cashMethod);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -95,13 +124,10 @@ class PaymentOptionList extends StatelessWidget {
         break;
 
       case 'QRIS':
-      // Set payment method dulu sebelum dialog
-        transactionCubit.setPaymentMethod(PaymentMethod.qris);
-        _showDigitalPaymentDialog(context, PaymentMethod.qris);
+        _showDigitalPaymentDialog(context, pm.PaymentType.qris);
         break;
 
       case 'Bank Transfer':
-      // Ke halaman pilih bank dulu
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -114,7 +140,6 @@ class PaymentOptionList extends StatelessWidget {
         break;
 
       case 'E-Wallet':
-      // Ke halaman pilih e-wallet dulu
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -128,14 +153,14 @@ class PaymentOptionList extends StatelessWidget {
     }
   }
 
-  void _showDigitalPaymentDialog(BuildContext context, PaymentMethod method) {
+  void _showDigitalPaymentDialog(BuildContext context, pm.PaymentType type) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.3),
       builder: (dialogContext) => BlocProvider.value(
         value: context.read<TransactionCubit>(),
-        child: DigitalPaymentDialog(paymentMethod: method),
+        child: DigitalPaymentDialog(paymentType: type),
       ),
     );
   }
@@ -241,20 +266,17 @@ class PaymentNoteField extends StatelessWidget {
 
 // Dialog QRIS dengan Blur Background
 class DigitalPaymentDialog extends StatelessWidget {
-  final PaymentMethod paymentMethod;
+  final pm.PaymentType paymentType;
 
-  const DigitalPaymentDialog({
-    super.key,
-    required this.paymentMethod,
-  });
+  const DigitalPaymentDialog({super.key, required this.paymentType});
 
   IconData get _icon {
-    switch (paymentMethod) {
-      case PaymentMethod.qris:
+    switch (paymentType) {
+      case pm.PaymentType.qris:
         return Icons.qr_code_scanner;
-      case PaymentMethod.bankTransfer:
+      case pm.PaymentType.bank:
         return Icons.account_balance;
-      case PaymentMethod.ewallet:
+      case pm.PaymentType.ewallet:
         return Icons.account_balance_wallet;
       default:
         return Icons.payment;
@@ -300,7 +322,7 @@ class DigitalPaymentDialog extends StatelessWidget {
 
                   // Title
                   Text(
-                    'Konfirmasi Pembayaran ${paymentMethod.displayName}',
+                    'Konfirmasi Pembayaran ${_getPaymentTypeName()}',
                     style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 18,
@@ -330,7 +352,7 @@ class DigitalPaymentDialog extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Rp ${totalTagihan}',
+                          'Rp $totalTagihan',
                           style: const TextStyle(
                             fontFamily: fontType,
                             fontSize: 20,
@@ -398,7 +420,7 @@ class DigitalPaymentDialog extends StatelessWidget {
 
                   // Message
                   Text(
-                    'Apakah pembayaran via ${paymentMethod.displayName} sudah berhasil?',
+                    'Apakah pembayaran via ${_getPaymentTypeName()} sudah berhasil?',
                     style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 13,
@@ -428,7 +450,6 @@ class DigitalPaymentDialog extends StatelessWidget {
                             FloatingMessage.show(
                               context,
                               message: 'Pembayaran dibatalkan',
-                              textOnly: true,
                               backgroundColor: Colors.red,
                             );
                           },
@@ -456,16 +477,10 @@ class DigitalPaymentDialog extends StatelessWidget {
                           ),
                           onPressed: () async {
                             final cubit = context.read<TransactionCubit>();
-                            final state = cubit.state;
+                            final stockBloc = context.read<StockBloc>();
+                            final productBloc = context.read<ProductBloc>();
 
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (_) => const Center(
-                                child: CircularProgressIndicator(color: primaryGreenColor),
-                              ),
-                            );
-
+                            // Validasi stok
                             bool hasStockIssue = false;
                             String errorMessage = '';
 
@@ -473,35 +488,46 @@ class DigitalPaymentDialog extends StatelessWidget {
                               final qty = state.getQuantity(product.id.toString());
                               final stock = product.productStock;
 
-                              if (qty > stock) {
+                              if (qty > stock!) {
                                 hasStockIssue = true;
                                 errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
                                     'Tersedia: $stock, Dipilih: $qty';
                                 break;
                               }
                             }
-                            if (context.mounted) Navigator.of(context).pop();
+
                             if (hasStockIssue) {
-                              Navigator.of(context).pop();
-                              FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                              Navigator.of(context).pop(); // Tutup dialog dulu
+                              if (context.mounted) {
+                                FloatingMessage.show(context, message: errorMessage, backgroundColor: Colors.red);
+                              }
                               return;
                             }
-                            cubit.completeDigitalPayment(paymentMethod);
-                            Navigator.of(context).pop();
-                            final stockBloc = context.read<StockBloc>();
 
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MultiBlocProvider(
-                                  providers: [
-                                    BlocProvider.value(value: cubit),
-                                    BlocProvider.value(value: stockBloc),
-                                  ],
-                                  child: const TransactionSuccess(),
-                                ),
-                              ),
+                            final selectedMethod = state.availablePaymentMethods.firstWhere(
+                                  (pm) => pm.type == paymentType,
                             );
+                            cubit.setPaymentMethod(selectedMethod);
+                            cubit.setReceivedAmount(state.finalTotal);
+                            cubit.completeDigitalPayment();
+
+                            Navigator.of(context).pop();
+
+                            if (context.mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MultiBlocProvider(
+                                    providers: [
+                                      BlocProvider.value(value: cubit),
+                                      BlocProvider.value(value: stockBloc),
+                                      BlocProvider.value(value: productBloc),
+                                    ],
+                                    child: const TransactionSuccess(),
+                                  ),
+                                ),
+                              );
+                            }
                           },
                           child: const Text(
                             'Berhasil',
@@ -522,5 +548,18 @@ class DigitalPaymentDialog extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _getPaymentTypeName() {
+    switch (paymentType) {
+      case pm.PaymentType.qris:
+        return 'QRIS';
+      case pm.PaymentType.bank:
+        return 'Bank Transfer';
+      case pm.PaymentType.ewallet:
+        return 'E-Wallet';
+      default:
+        return 'Digital';
+    }
   }
 }
