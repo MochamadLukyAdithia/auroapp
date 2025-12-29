@@ -38,8 +38,6 @@ class _RegisterPageState extends State<RegisterPage> {
           final userId = state.userId;
           final email = state.email;
 
-          print('🚀 Navigating with userId: $userId, email: $email'); // ✅ Tambah ini
-
           FloatingMessage.show(
             context,
             message: 'Registrasi berhasil! Silakan verifikasi email',
@@ -63,10 +61,10 @@ class _RegisterPageState extends State<RegisterPage> {
           });
         }
 
-        else if (state.status == RegisterStatus.failure) {
+        else if (state.status == RegisterStatus.failure && state.errorMessage != null) {
           FloatingMessage.show(
             context,
-            message: state.errorMessage ?? 'Registrasi gagal',
+            message: state.errorMessage!,
             backgroundColor: Colors.red,
             icon: Icons.error_outline,
             duration: const Duration(seconds: 3),
@@ -90,7 +88,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     const _EmailField(),
                     const SizedBox(height: 24),
                     _PasswordField(
-                      label: 'Kata Sandi',
+                      label: 'Kata Sandi*',
                       hint: 'Masukkan Kata Sandi',
                       obscureText: _obscurePassword,
                       onChanged: (value) {
@@ -105,7 +103,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 24),
                     _PasswordField(
-                      label: 'Konfirmasi Kata Sandi',
+                      label: 'Konfirmasi Kata Sandi*',
                       hint: 'Masukkan Konfirmasi Kata Sandi',
                       obscureText: _obscureConfirmPassword,
                       onChanged: (value) {
@@ -147,7 +145,7 @@ class _FullNameField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Nama Lengkap',
+              'Nama Lengkap*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -221,7 +219,7 @@ class _EmailField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Email',
+              'Email*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -388,7 +386,7 @@ class _PhoneField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Nomor Handphone',
+              'Nomor Handphone*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
