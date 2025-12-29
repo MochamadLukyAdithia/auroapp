@@ -30,9 +30,9 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
       body: BlocConsumer<PaymentMethodCubit, PaymentMethodState>(
         listener: (context, state) {
           if (state is PaymentMethodOperationSuccess) {
-            FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+            FloatingMessage.show(context, message: state.message, backgroundColor: primaryGreenColor);
           } else if (state is PaymentMethodError) {
-            FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+            FloatingMessage.show(context, message: state.message, backgroundColor: Colors.red);
           }
         },
         builder: (context, state) {
@@ -124,7 +124,7 @@ class PaymentSectionHeader extends StatelessWidget {
   }
 }
 
-class PaymentMethodItem extends StatefulWidget {
+class PaymentMethodItem extends StatelessWidget {
   final PaymentMethod paymentMethod;
   final ValueChanged<bool> onChanged;
 
@@ -133,13 +133,6 @@ class PaymentMethodItem extends StatefulWidget {
     required this.paymentMethod,
     required this.onChanged,
   });
-
-  @override
-  State<PaymentMethodItem> createState() => _PaymentMethodItemState();
-}
-
-class _PaymentMethodItemState extends State<PaymentMethodItem> {
-  bool _isToggling = false;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +148,7 @@ class _PaymentMethodItemState extends State<PaymentMethodItem> {
         children: [
           Expanded(
             child: Text(
-              widget.paymentMethod.name,
+              paymentMethod.name,
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -164,24 +157,10 @@ class _PaymentMethodItemState extends State<PaymentMethodItem> {
               ),
             ),
           ),
-          // ✅ Show loading saat toggle
-          _isToggling
-              ? const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-              : Switch(
-            value: widget.paymentMethod.isEnabled,
-            onChanged: (value) async {
-              setState(() => _isToggling = true);
-              widget.onChanged(value);
-              // Wait sebentar untuk animasi
-              await Future.delayed(const Duration(milliseconds: 500));
-              if (mounted) {
-                setState(() => _isToggling = false);
-              }
-            },
+          // ✅ Langsung toggle tanpa loading
+          Switch(
+            value: paymentMethod.isEnabled,
+            onChanged: onChanged, // ✅ Langsung panggil callback
             activeColor: Colors.white,
             activeTrackColor: primaryGreenColor,
             inactiveThumbColor: Colors.white,
