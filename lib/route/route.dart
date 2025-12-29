@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart'; // ✅ Tambahkan import ini
+import 'package:pos_mobile/ui/owner/pages/auth/forgot_password.dart';
 import 'package:pos_mobile/ui/owner/pages/auth/register_page.dart';
 import 'package:pos_mobile/ui/owner/pages/auth/resend_otp_from_login.dart';
 import 'package:pos_mobile/ui/owner/pages/finances/add_finance.dart';
@@ -20,9 +21,12 @@ import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_payment.dart
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/detail_transaction.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/e-wallet.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
+import 'package:pos_mobile/ui/widgets/transaction_receipt.dart';
 import '../blocs/auth/verification/verification_bloc.dart';
 import '../blocs/customer/customer_bloc.dart'; // ✅ Tambahkan import CustomerBloc
+import '../data/models/company_model.dart';
 import '../data/models/customer_model.dart';
+import '../data/models/transaction_model.dart';
 import '../data/repositories/auth_repository.dart';
 import '../ui/owner/pages/auth/auth_checker.dart';
 import '../ui/owner/pages/auth/login_page.dart';
@@ -43,6 +47,7 @@ import '../ui/owner/pages/more/report/expenditure/expenditure_report.dart';
 import '../ui/owner/pages/more/report/report_page.dart';
 import '../ui/owner/pages/more/report/sales/sales_report.dart';
 import '../ui/owner/pages/more/settings/cashiers/cashier_page.dart';
+import '../ui/owner/pages/more/settings/change_password.dart';
 import '../ui/owner/pages/more/settings/setting_page.dart';
 import '../ui/owner/pages/more/settings/shop/company_page.dart';
 import '../ui/owner/pages/more/suppliers/add_supplier.dart';
@@ -60,6 +65,7 @@ import '../ui/widgets/bottom_bar.dart';
 class AppRoutes {
   static const String splash = '/';
   static const String login = '/auth/login/';
+  static const String forgotPassword = '/auth/forgot_password';
   static const String register = '/auth/register';
   static const String verification = '/auth/register/verification';
   static const String resendOtp = '/auth/login/verification';
@@ -83,6 +89,7 @@ class AppRoutes {
   static const String bankPayment = '/transaction/sale/detail_transaction/detail_payment/bank_payment';
   static const String ewalletPayment = '/transaction/sale/detail_transaction/detail_payment/ewallet_payment';
   static const String transactionSuccess = '/transaction/sale/detail_transaction/detail_payment/transaction_success';
+  static const String transactionReceipt = '/transaction/sale/detail_transaction/detail_payment/transaction_success/transaction_receipt';
 
   //---------------- FINANCE PAGE ----------------
   static const String finance = '/finance';
@@ -114,6 +121,7 @@ class AppRoutes {
   static const String shop = '/more/setting/company';
   static const String updateShop = '/more/setting/company/update_shop';
   static const String ownerProfile = '/more/setting/owner_profile';
+  static const String changePassword = '/more/setting/change_password';
   static const String updateOwnerProfile = '/more/setting/owner_profile/update_owner_profile';
   static const String cashierProfile = '/more/cashier_profile';
   static const String updateCashierProfile = '/more/cashier_profile/update_cashier_profile';
@@ -129,6 +137,9 @@ class AppRoutes {
 
       case login:
         return MaterialPageRoute(builder: (_) => const LoginPage());
+
+      case forgotPassword:
+        return MaterialPageRoute(builder: (_) => const ForgotPassword());
 
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterPage());
@@ -228,6 +239,17 @@ class AppRoutes {
       case transactionSuccess:
         return MaterialPageRoute(builder: (_) => const TransactionSuccess());
 
+      case transactionReceipt:
+        final args = settings.arguments as Map<String, dynamic>;
+        final transaction = args['transaction'] as TransactionModel;
+        final company = args['company'] as Company;
+        return MaterialPageRoute(
+          builder: (_) => TransactionReceiptPage(
+            transaction: transaction,
+            company: company,
+          ),
+        );
+
     // ============ FINANCE ============
       case finance:
         return MaterialPageRoute(builder: (_) => const FinancePage());
@@ -289,6 +311,9 @@ class AppRoutes {
       case ownerProfile:
         return MaterialPageRoute(builder: (_) => const OwnerProfile());
 
+      case changePassword:
+        return MaterialPageRoute(builder: (_) => const ChangePassword());
+
       case cashierProfile:
         return MaterialPageRoute(builder: (_) => const ProfileCashier());
 
@@ -299,10 +324,13 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const CompanyPage());
 
       case updateShop:
-        return MaterialPageRoute(builder: (_) => const CompanyPageUpdate());
+        final company = settings.arguments as Company?; // ✅ Cast ke Company dengan null safety
+        return MaterialPageRoute(
+          builder: (_) => CompanyPageUpdate(company: company),
+        );
 
       case salesReport:
-        return MaterialPageRoute(builder: (_) => const SalesReportPage());
+        return MaterialPageRoute(builder: (context) => const SalesReportPage());
 
       case guide:
         return MaterialPageRoute(builder: (_) => const GuidePage());
