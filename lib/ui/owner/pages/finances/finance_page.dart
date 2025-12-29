@@ -12,132 +12,141 @@ import 'add_finance.dart';
 import 'filtered_finance_date.dart';
 
 
-class FinancePage extends StatelessWidget {
+class FinancePage extends StatefulWidget {
   const FinancePage({super.key});
+
+  @override
+  State<FinancePage> createState() => _FinancePageState();
+}
+
+class _FinancePageState extends State<FinancePage> {
+  // ✅ TAMBAHKAN initState untuk fetch data pertama kali
+  @override
+  void initState() {
+    super.initState();
+    // Fetch data saat page pertama kali dibuka
+    context.read<FinanceBloc>().add(const FetchFinances());
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<FinanceBloc, FinanceState>(
-        builder: (context, state) {
-          bool showFab = false;
+      builder: (context, state) {
+        bool showFab = false;
 
-          if (state is FinanceLoaded && state.filteredFinances.isNotEmpty) {
-            showFab = true;
-          }
+        if (state is FinanceLoaded && state.filteredFinances.isNotEmpty) {
+          showFab = true;
+        }
 
-          return Scaffold(
-            appBar: const CustomAppBar(title: 'Keuangan'),
-            floatingActionButton: showFab
-                ? Padding(padding: const EdgeInsets.only(bottom: 80.0),
-              child: FloatingActionButton(
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddFinancePage()),
-                  );
-                  if (result != null && result is Finance) {
-                    context.read<FinanceBloc>().add(AddFinance(result));
-                  }
-                },
-                backgroundColor: primaryGreenColor,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ): null,
-
-
-            body: BlocConsumer<FinanceBloc, FinanceState>(
-              listener: (context, state) {
-                if (state is FinanceError) {
-                  FloatingMessage.show(
-                    context,
-                    message: state.message,
-                    backgroundColor: Colors.red,
-                  );
+        return Scaffold(
+          appBar: const CustomAppBar(title: 'Keuangan'),
+          floatingActionButton: showFab
+              ? Padding(
+            padding: const EdgeInsets.only(bottom: 80.0),
+            child: FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddFinancePage()),
+                );
+                if (result != null && result is Finance) {
+                  context.read<FinanceBloc>().add(AddFinance(result));
                 }
-                if (state is FinanceOperationSuccess) {
-                  FloatingMessage.show(
-                    context,
-                    message: state.message,
-                    backgroundColor: primaryGreenColor,
-                  );
-                }
-
               },
-              builder: (context, state) {
-                if (state is FinanceLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: primaryGreenColor,
-                    ),
-                  );
+              backgroundColor: primaryGreenColor,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          )
+              : null,
+          body: BlocConsumer<FinanceBloc, FinanceState>(
+            listener: (context, state) {
+              if (state is FinanceError) {
+                FloatingMessage.show(
+                  context,
+                  message: state.message,
+                  backgroundColor: Colors.red,
+                );
+              }
+              if (state is FinanceOperationSuccess) {
+                FloatingMessage.show(
+                  context,
+                  message: state.message,
+                  backgroundColor: primaryGreenColor,
+                );
+              }
+            },
+            builder: (context, state) {
+              if (state is FinanceLoading) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: primaryGreenColor,
+                  ),
+                );
+              }
+
+              if (state is FinanceLoaded) {
+                final finances = state.filteredFinances;
+
+                // ✅ Kalau kosong, hanya tampil EmptyFinanceSection
+                if (finances.isEmpty &&
+                    (state.searchQuery?.isEmpty ?? true) &&
+                    state.filterType == null) {
+                  return const EmptyFinanceSection();
                 }
 
-                if (state is FinanceLoaded) {
-                  final finances = state.filteredFinances;
-
-                  // ✅ Kalau kosong, hanya tampil EmptyFinanceSection
-                  if (finances.isEmpty &&
-                      (state.searchQuery?.isEmpty ?? true) &&
-                      state.filterType == null) {
-                    return const EmptyFinanceSection();
-                  }
-
-                  // ✅ Kalau sudah ada data, tampil layout utama
-                  return Column(
-                    children: [
-                      // FinanceSummaryCard(
-                      //   totalIncome: state.totalIncome,
-                      //   totalExpense: state.totalExpense,
-                      //   balance: state.balance,
-                      // ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: FinanceSearchBar(
-                                onSearchChanged: (query) {
-                                  context.read<FinanceBloc>().add(SearchFinances(query));
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FilterButton(
-                              hasActiveFilter: state.filterType != null ||
-                                  state.startDate != null ||
-                                  state.endDate != null ||
-                                  (state.sortBy != null && state.sortBy != 'date_desc'),
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => BlocProvider.value(
-                                      value: context.read<FinanceBloc>(),
-                                      child: const FilteredFinancesPage(),
-                                    ),
-                                  ),
-                                );
+                // ✅ Kalau sudah ada data, tampil layout utama
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FinanceSearchBar(
+                              onSearchChanged: (query) {
+                                context.read<FinanceBloc>().add(
+                                    SearchFinances(query));
                               },
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilterButton(
+                            hasActiveFilter: state.filterType != null ||
+                                state.startDate != null ||
+                                state.endDate != null ||
+                                (state.sortBy != null &&
+                                    state.sortBy != 'date_desc'),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      BlocProvider.value(
+                                        value: context.read<FinanceBloc>(),
+                                        child: const FilteredFinancesPage(),
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                      Expanded(
-                        child: FinanceListView(finances: finances),
-                      ),
-                    ],
-                  );
-                }
+                    ),
+                    Expanded(
+                      child: FinanceListView(finances: finances),
+                    ),
+                  ],
+                );
+              }
 
-                return const EmptyFinanceSection();
-              },
-            ),
-          );
-        },
-      );
+              return const EmptyFinanceSection();
+            },
+          ),
+        );
+      },
+    );
   }
 }
-
 
 // // Summary Card
 // class FinanceSummaryCard extends StatelessWidget {
@@ -580,7 +589,7 @@ class FinanceListView extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final finance = finances[index];
                   final isIncome = finance.type == FinanceType.income;
-                  final isSelected = state.selectedFinanceIds.contains(finance.id);
+                  final isSelected = state.selectedFinanceIds.contains(finance.id.toString());
 
                   return GestureDetector(
                     // 🆕 Long press untuk masuk selection mode
