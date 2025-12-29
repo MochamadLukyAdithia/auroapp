@@ -7,7 +7,6 @@ import 'dio.dart';
 class ProfileRepository {
   final Dio _dio = dio();
 
-  // Get user profile
   Future<ApiResponse<Owner>> getProfile() async {
     try {
       final response = await _dio.get('/user/profile');
@@ -15,18 +14,16 @@ class ProfileRepository {
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // Parsing response sesuai struktur API Laravel
-        if (data['success'] == true) {
+        if (data['success'] == true && data['data'] != null) {
           final owner = Owner.fromJson(data['data']);
-
           return ApiResponse.success(
-            message: data['message'] ?? 'Profil berhasil dimuat',
+            message: 'Profil berhasil dimuat',
             data: owner,
             code: response.statusCode ?? 200,
           );
         } else {
           return ApiResponse.error(
-            message: data['message'] ?? 'Gagal memuat profil',
+            message: 'Gagal memuat profil - data kosong',
             code: response.statusCode ?? 500,
           );
         }
@@ -46,39 +43,33 @@ class ProfileRepository {
     }
   }
 
-  // Update user profile
   Future<ApiResponse<Owner>> updateProfile({
     required String fullName,
     required String phoneNumber,
-    required String userAddress,
-    String? email,
   }) async {
     try {
       final response = await _dio.post(
         '/user/profile/update-profile',
         data: {
-          'name': fullName,
-          'noTelephone': phoneNumber,
-          'address': userAddress,
-          if (email != null) 'email': email,
+          'full_name': fullName,
+          'phone_number': phoneNumber,
         },
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        if (data['success'] == true) {
-          final owner = Owner.fromJson(data['data']);
-
+        // ✅ Backend pakai structure "meta" dan "data"
+        if (data['meta']?['status'] == true) { // UBAH dari data['success']
           return ApiResponse.success(
-            message: data['message'] ?? 'Profil berhasil diperbarui',
-            data: owner,
+            message: data['meta']['message'] ?? 'Profil berhasil diperbarui',
+            data: null,
             code: response.statusCode ?? 200,
           );
         } else {
           return ApiResponse.error(
-            message: data['message'] ?? 'Gagal memperbarui profil',
-            code: response.statusCode ?? 500,
+            message: data['meta']?['message'] ?? 'Gagal memperbarui profil',
+            code: data['meta']?['code'] ?? 500,
           );
         }
       }
@@ -97,104 +88,94 @@ class ProfileRepository {
     }
   }
 
-  // Update profile dengan FormData (untuk upload foto)
-  Future<ApiResponse<Owner>> updateProfileWithPhoto({
-    required String name,
-    required String phone,
-    required String address,
-    String? email,
-    String? photoPath,
+  Future<ApiResponse<void>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
   }) async {
     try {
-      final formData = FormData.fromMap({
-        'name': name,
-        'phone': phone,
-        'address': address,
-        if (email != null) 'email': email,
-        if (photoPath != null)
-          'photo': await MultipartFile.fromFile(
-            photoPath,
-            filename: photoPath.split('/').last,
-          ),
-      });
-
       final response = await _dio.post(
         '/user/profile/update-profile',
-        data: formData,
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
+        },
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        if (data['success'] == true) {
-          final owner = Owner.fromJson(data['data']);
-
+        if (data['meta']?['status'] == true) {
           return ApiResponse.success(
-            message: data['message'] ?? 'Profil berhasil diperbarui',
-            data: owner,
+            message: data['meta']['message'] ?? 'Password berhasil diubah',
+            data: null,
             code: response.statusCode ?? 200,
           );
         } else {
+          // Handle specific error messages from backend
+          final errorMessage = data['meta']?['message'] ?? 'Gagal mengubah password';
+
           return ApiResponse.error(
-            message: data['message'] ?? 'Gagal memperbarui profil',
-            code: response.statusCode ?? 500,
+            message: errorMessage,
+            code: data['meta']?['code'] ?? 400,
           );
         }
       }
 
       return ApiResponse.error(
-        message: 'Gagal memperbarui profil',
+        message: 'Gagal mengubah password',
         code: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
-    } catch (e) {
-      return ApiResponse.error(
-        message: 'Terjadi kesalahan: ${e.toString()}',
-        code: 500,
-      );
     }
   }
 
-  // Handle Dio errors
-  ApiResponse<Owner> _handleDioError(DioException e) {
-    String message = 'Terjadi kesalahan';
-    int code = 500;
+// Handler untuk DioException
+  ApiResponse<T> _handleDioError<T>(DioException e) {
+    String errorMessage = 'Terjadi kesalahan';
+    int errorCode = 500;
 
     if (e.response != null) {
-      code = e.response!.statusCode ?? 500;
+      errorCode = e.response!.statusCode ?? 500;
 
       // Parse error message dari response
-      if (e.response!.data is Map) {
-        message = e.response!.data['message'] ??
-            e.response!.data['error'] ??
-            'Terjadi kesalahan';
-      } else {
-        message = e.response!.statusMessage ?? 'Terjadi kesalahan';
+      final data = e.response!.data;
+      if (data is Map<String, dynamic>) {
+        errorMessage = data['meta']?['message'] ??
+            data['message'] ??
+            'Gagal mengubah password';
       }
     } else {
-      // Handle connection errors
+      // Network errors
       switch (e.type) {
         case DioExceptionType.connectionTimeout:
-          message = 'Koneksi timeout';
+          errorMessage = 'Koneksi timeout, periksa jaringan Anda';
           break;
         case DioExceptionType.sendTimeout:
-          message = 'Timeout saat mengirim data';
+          errorMessage = 'Pengiriman data timeout';
           break;
         case DioExceptionType.receiveTimeout:
-          message = 'Timeout saat menerima data';
+          errorMessage = 'Penerimaan data timeout';
           break;
         case DioExceptionType.connectionError:
-          message = 'Tidak ada koneksi internet';
+          errorMessage = 'Tidak dapat terhubung ke server';
+          break;
+        case DioExceptionType.badResponse:
+          errorMessage = 'Response server tidak valid';
           break;
         case DioExceptionType.cancel:
-          message = 'Request dibatalkan';
+          errorMessage = 'Request dibatalkan';
           break;
         default:
-          message = e.message ?? 'Terjadi kesalahan';
+          errorMessage = 'Terjadi kesalahan: ${e.message}';
       }
     }
 
-    return ApiResponse.error(message: message, code: code);
+    return ApiResponse.error(
+      message: errorMessage,
+      code: errorCode,
+    );
   }
 }
