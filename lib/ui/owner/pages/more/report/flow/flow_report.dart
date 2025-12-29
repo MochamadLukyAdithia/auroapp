@@ -365,14 +365,15 @@ class _FlowReportPageState extends State<FlowReportPage> {
     // Gabungkan transaksi penjualan dan keuangan
     final List<Map<String, dynamic>> items = [];
 
-    // Tambahkan transaksi penjualan
+    // Tambahkan transaksi penjualan - PERBAIKI INI
     for (var transaction in state.filteredTransactions) {
       items.add({
-        'date': transaction.transactionDate,
+        'date': DateTime.parse(transaction.tanggal), // ✅ Parse dari string
         'type': 'sales',
-        'description': 'Penjualan',
-        'amount': transaction.totalPayment,
-        'profit': transaction.totalProfit,
+        'description': 'Penjualan #${transaction.kodeTransaksi}',
+        'amount': transaction.bayar.toInt(), // ✅ Convert ke int untuk grouping
+        'profit': transaction.keuntungan.toInt(),
+        'transaction': transaction, // ✅ Simpan object asli
       });
     }
 
@@ -382,8 +383,9 @@ class _FlowReportPageState extends State<FlowReportPage> {
         'date': finance.date,
         'type': finance.type == FinanceType.income ? 'income' : 'expense',
         'description': finance.name,
-        'amount': finance.amount,
+        'amount': finance.amount.toInt(),
         'notes': finance.description,
+        'finance': finance, // ✅ Simpan object asli
       });
     }
 
@@ -613,9 +615,10 @@ class _FlowReportPageState extends State<FlowReportPage> {
     final state = context.read<FinancialReportCubit>().state;
 
     final transactionsOnDate = state.filteredTransactions.where((t) {
-      return t.transactionDate.year == date.year &&
-          t.transactionDate.month == date.month &&
-          t.transactionDate.day == date.day;
+      final transactionDate = DateTime.parse(t.tanggal); // ✅ Parse dari string
+      return transactionDate.year == date.year &&
+          transactionDate.month == date.month &&
+          transactionDate.day == date.day;
     }).toList();
 
     final financesOnDate = state.filteredFinances.where((f) {

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:pos_mobile/data/models/transaction_model.dart';
+import 'package:pos_mobile/data/models/transaction_sales_report_model.dart';
 import 'package:pos_mobile/ui/owner/pages/more/report/sales/transaction_detail.dart';
 import '../../../../../../blocs/sales_report/sales_report_cubit.dart';
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../../core/utils/auth_service.dart';
 import '../../../../../widgets/custom_app_bar.dart';
 
 class SalesReportPage extends StatefulWidget {
@@ -16,38 +17,65 @@ class SalesReportPage extends StatefulWidget {
 }
 
 class _SalesReportPageState extends State<SalesReportPage> {
+  bool _isCashier = false; // ✅ Track role
+  bool _isLoading = true; // ✅ Loading state
 
   @override
   void initState() {
     super.initState();
-    context.read<SalesReportCubit>().loadTransactions();
+    _initializeData();
+  }
+
+  // ✅ Check role dan load data yang sesuai
+  Future<void> _initializeData() async {
+    final isCashier = await AuthService.isCashier();
+    setState(() {
+      _isCashier = isCashier;
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (_isCashier) {
+        context.read<SalesReportCubit>().loadCashierTransactions();
+      } else {
+        context.read<SalesReportCubit>().loadTransactions();
+      }
+    }
   }
 
   // Helper
-  String _formatCurrency(int value) {
+  String _formatCurrency(double value) {
     return NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0)
         .format(value);
   }
 
+  // ✅ Handle refresh berdasarkan role
+  Future<void> _handleRefresh() async {
+    if (_isCashier) {
+      return context.read<SalesReportCubit>().loadCashierTransactions();
+    } else {
+      return context.read<SalesReportCubit>().loadTransactions();
+    }
+  }
 
-    @override
+  @override
   Widget build(BuildContext context) {
+    // ✅ Show loading saat check role
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: const CustomAppBar(title: 'Laporan Penjualan'),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: const CustomAppBar(title: 'Laporan Penjualan'),
       body: BlocBuilder<SalesReportCubit, SalesReportState>(
         builder: (context, state) {
-
-          if (state.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: primaryGreenColor),
-            );
-          }
-
-          // SECTION: Main Content
           return RefreshIndicator(
-            onRefresh: () =>
-                context.read<SalesReportCubit>().loadTransactions(),
+            onRefresh: _handleRefresh, // ✅ Gunakan handler yang sudah cek role
             color: primaryGreenColor,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -55,12 +83,40 @@ class _SalesReportPageState extends State<SalesReportPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // === FILTER DATE RANGE === ← TAMBAH INI
+                  // ✅ BADGE ROLE (Optional - untuk debugging/info)
+                  if (_isCashier)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: Colors.blue.shade700),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Menampilkan transaksi Anda saja',
+                            style: TextStyle(
+                              fontFamily: fontType,
+                              fontSize: 12,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // === FILTER DATE RANGE ===
                   FilterDateSection(
                     startDate: state.startDate,
                     endDate: state.endDate,
                     onDateRangeSelected: (start, end) {
-                      context.read<SalesReportCubit>().setDateRange(start, end);
+                      context.read<SalesReportCubit>().setDateRange(start, end, isCashier: _isCashier);
                     },
                   ),
                   // Reset button jika ada custom date
@@ -70,8 +126,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
                       child: TextButton.icon(
                         onPressed: () {
                           final cubit = context.read<SalesReportCubit>();
-                          cubit.setDateRange(null, null);
-                          cubit.loadTransactions();
+                          cubit.setDateRange(null, null, isCashier: _isCashier);
                         },
                         icon: const Icon(Icons.clear, size: 16),
                         label: const Text('Reset ke Periode'),
@@ -81,15 +136,13 @@ class _SalesReportPageState extends State<SalesReportPage> {
                       ),
                     ),
 
-                  const SizedBox(height: 16,),
+                  const SizedBox(height: 16),
 
                   // === FILTER PERIODE ===
                   _PeriodSelector(
                     selectedPeriod: state.selectedPeriod,
                     onPeriodChanged: (period) {
-                      context.read<SalesReportCubit>()
-                      ..setPeriod(period)
-                      ..setDateRange(null, null);
+                      context.read<SalesReportCubit>().setPeriod(period, isCashier: _isCashier);
                     },
                   ),
 
@@ -108,7 +161,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
 
                   // === RIWAYAT TRANSAKSI ===
                   _TransactionListSection(
-                    transactions: state.filteredTransactions,
+                    transactions: state.transactions,
                     formatCurrency: _formatCurrency,
                   ),
                 ],
@@ -226,10 +279,10 @@ class FilterDateSection extends StatelessWidget {
   }
 }
 
-// -------------------- summary section (total, keuntungan, transaksi, margin, total item) --------------------
+// -------------------- summary section --------------------
 class _SalesSummarySection extends StatelessWidget {
   final SalesReportState state;
-  final String Function(int) formatCurrency;
+  final String Function(double) formatCurrency;
 
   const _SalesSummarySection({
     required this.state,
@@ -276,7 +329,7 @@ class _SalesSummarySection extends StatelessWidget {
             Expanded(
               child: _SummaryCard(
                 title: 'Total Item Terjual',
-                value: '${state.totalItemsSold} item',
+                value: '${state.totalItemsSold.toInt()} item',
                 icon: Icons.shopping_cart,
                 color: Colors.orange,
               ),
@@ -284,7 +337,6 @@ class _SalesSummarySection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-
       ],
     );
   }
@@ -292,7 +344,7 @@ class _SalesSummarySection extends StatelessWidget {
 
 // -------------------- Graphics (Chart) --------------------
 class _SalesChartSection extends StatelessWidget {
-  final Map<DateTime, int> data;
+  final Map<DateTime, double> data;
   final ReportPeriod period;
 
   const _SalesChartSection({
@@ -318,22 +370,84 @@ class _SalesChartSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Grafik Penjualan',
+          // 🆕 Header dengan info
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Grafik Penjualan',
+                style: TextStyle(
+                  fontFamily: fontType,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // 🆕 Legend
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primaryGreenColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: primaryGreenColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Pendapatan',
+                      style: TextStyle(
+                        fontFamily: fontType,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: primaryGreenColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 🆕 Keterangan periode
+          Text(
+            _getPeriodDescription(period),
             style: TextStyle(
               fontFamily: fontType,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: Colors.grey.shade600,
             ),
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 200,
+            height: 220, // Tinggi ditambah sedikit
             child: _SalesChart(data: data, period: period),
           ),
         ],
       ),
     );
+  }
+
+  String _getPeriodDescription(ReportPeriod period) {
+    switch (period) {
+      case ReportPeriod.today:
+        return 'Penjualan per jam hari ini';
+      case ReportPeriod.week:
+        return 'Penjualan 7 hari terakhir';
+      case ReportPeriod.month:
+        return 'Penjualan bulan ini';
+      case ReportPeriod.year:
+        return 'Penjualan tahun ini';
+      default:
+        return 'Penjualan periode dipilih';
+    }
   }
 }
 
@@ -341,29 +455,31 @@ class _SalesChartSection extends StatelessWidget {
 // SECTION: TRANSACTION LIST
 // ===================================================================
 class _TransactionListSection extends StatelessWidget {
-  final List<TransactionModel> transactions;
-  final String Function(int) formatCurrency;
+  final List<TransactionReport> transactions;
+  final String Function(double) formatCurrency;
 
   const _TransactionListSection({
     required this.transactions,
     required this.formatCurrency,
   });
 
-  Map<String, Map<String, dynamic>> _groupByDate(List<TransactionModel> transactions) {
+  Map<String, Map<String, dynamic>> _groupByDate(List<TransactionReport> transactions) {
     final Map<String, Map<String, dynamic>> grouped = {};
     for (var t in transactions) {
-      final dateKey = DateFormat('yyyy-MM-dd').format(t.transactionDate);
+      final dateKey = t.tanggal.split(' ')[0];
       if (!grouped.containsKey(dateKey)) {
         grouped[dateKey] = {
-          'date': t.transactionDate,
+          'date': DateTime.parse(t.tanggal),
           'count': 0,
-          'totalRevenue': 0,
-          'totalProfit': 0,
+          'totalRevenue': 0.0,
+          'totalProfit': 0.0,
+          'transactions': <TransactionReport>[],
         };
       }
       grouped[dateKey]!['count'] += 1;
-      grouped[dateKey]!['totalRevenue'] += t.totalPayment;
-      grouped[dateKey]!['totalProfit'] += t.totalProfit;
+      grouped[dateKey]!['totalRevenue'] += t.totalPenjualan;
+      grouped[dateKey]!['totalProfit'] += t.keuntungan;
+      grouped[dateKey]!['transactions'].add(t);
     }
     return grouped;
   }
@@ -421,39 +537,37 @@ class _TransactionListSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ...dateKeys.map((dateKey){
+        ...dateKeys.map((dateKey) {
           final data = grouped[dateKey]!;
-          final transactionsForDate = transactions.where((t) {
-            return DateFormat('yyyy-MM-dd').format(t.transactionDate) == dateKey;
-          }).toList();
+          final transactionsForDate = data['transactions'] as List<TransactionReport>;
+
           return _TransactionCard(
             date: data['date'],
             transactionCount: data['count'],
             totalRevenue: data['totalRevenue'],
             totalProfit: data['totalProfit'],
             formatCurrency: formatCurrency,
-            // ✅ TAMBAH onTap untuk navigate
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => TransactionDetailPage(
                     date: data['date'],
-                    transactions: transactionsForDate, // ✅ Kirim ke halaman baru
+                    transactions: transactionsForDate,
                     formatCurrency: formatCurrency,
                   ),
                 ),
               );
             },
           );
-        })
-        ]
+        }).toList(),
+      ],
     );
   }
 }
 
 // ===================================================================
-// SECTION: REUSABLE WIDGETS
+// SECTION: REUSABLE WIDGETS (TIDAK BERUBAH)
 // ===================================================================
 class _PeriodSelector extends StatelessWidget {
   final ReportPeriod selectedPeriod;
@@ -476,14 +590,12 @@ class _PeriodSelector extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onPeriodChanged(period),
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? primaryGreenColor : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color:
-                    isSelected ? primaryGreenColor : Colors.grey.shade300,
+                    color: isSelected ? primaryGreenColor : Colors.grey.shade300,
                   ),
                 ),
                 child: Text(
@@ -492,8 +604,7 @@ class _PeriodSelector extends StatelessWidget {
                     fontFamily: fontType,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color:
-                    isSelected ? Colors.white : Colors.grey.shade700,
+                    color: isSelected ? Colors.white : Colors.grey.shade700,
                   ),
                 ),
               ),
@@ -569,7 +680,7 @@ class _SummaryCard extends StatelessWidget {
 // SECTION: SALES CHART
 // ===================================================================
 class _SalesChart extends StatelessWidget {
-  final Map<DateTime, int> data;
+  final Map<DateTime, double> data;
   final ReportPeriod period;
 
   const _SalesChart({required this.data, required this.period});
@@ -578,12 +689,20 @@ class _SalesChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data.isEmpty || data.values.every((v) => v == 0)) {
       return Center(
-        child: Text(
-          'Belum ada data penjualan',
-          style: TextStyle(
-            fontFamily: fontType,
-            color: Colors.grey.shade400,
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bar_chart_outlined, size: 48, color: Colors.grey.shade300),
+            const SizedBox(height: 8),
+            Text(
+              'Belum ada data penjualan',
+              style: TextStyle(
+                fontFamily: fontType,
+                color: Colors.grey.shade400,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -593,54 +712,103 @@ class _SalesChart extends StatelessWidget {
 
     final maxY = sortedEntries
         .map((e) => e.value)
-        .reduce((a, b) => a > b ? a : b)
-        .toDouble();
+        .reduce((a, b) => a > b ? a : b);
 
     final spots = sortedEntries
         .asMap()
         .entries
-        .map((entry) => FlSpot(entry.key.toDouble(), entry.value.value.toDouble()))
+        .map((entry) => FlSpot(entry.key.toDouble(), entry.value.value))
         .toList();
 
     return LineChart(
       LineChartData(
+        // 🆕 TOOLTIP INTERAKTIF
+        lineTouchData: LineTouchData(
+          enabled: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (touchedSpot) => Colors.black87,
+            tooltipBorder: const BorderSide(color: Colors.transparent),
+            tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((spot) {
+                final index = spot.x.toInt();
+                if (index < 0 || index >= sortedEntries.length) {
+                  return null;
+                }
+
+                final date = sortedEntries[index].key;
+                final value = spot.y;
+
+                String dateLabel;
+                if (period == ReportPeriod.today) {
+                  dateLabel = DateFormat('HH:00').format(date);
+                } else if (period == ReportPeriod.week) {
+                  dateLabel = DateFormat('EEE, dd MMM', 'id').format(date);
+                } else {
+                  dateLabel = DateFormat('dd MMM yyyy', 'id').format(date);
+                }
+
+                return LineTooltipItem(
+                  '$dateLabel\n${NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0).format(value)}',
+                  const TextStyle(
+                    fontFamily: fontType,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                );
+              }).toList();
+            },
+          ),
+          touchCallback: (event, response) {},
+          handleBuiltInTouches: true,
+        ),
+
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
+          drawVerticalLine: true, // 🆕 Tampilkan garis vertikal
+          verticalInterval: 1,
           horizontalInterval: maxY > 0 ? maxY / 4 : 1000,
           getDrawingHorizontalLine: (value) => FlLine(
             color: Colors.grey.shade200,
             strokeWidth: 1,
           ),
+          getDrawingVerticalLine: (value) => FlLine(
+            color: Colors.grey.shade100,
+            strokeWidth: 1,
+          ),
         ),
+
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 50,
+              reservedSize: 55, // Lebih lebar
+              interval: maxY > 0 ? maxY / 4 : 1000,
               getTitlesWidget: (value, meta) {
-                if (value == maxY || value == 0) {
-                  return Text(
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
                     NumberFormat.compact(locale: 'id').format(value),
                     style: TextStyle(
                       fontFamily: fontType,
-                      fontSize: 10,
+                      fontSize: 11,
                       color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
                     ),
-                  );
-                }
-                return const SizedBox();
+                    textAlign: TextAlign.right,
+                  ),
+                );
               },
             ),
           ),
-          rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false)),
-          topTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 30,
+              reservedSize: 32,
+              interval: _getBottomInterval(sortedEntries.length),
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index < 0 || index >= sortedEntries.length) {
@@ -653,12 +821,11 @@ class _SalesChart extends StatelessWidget {
                 if (period == ReportPeriod.today) {
                   label = DateFormat('HH:00').format(date);
                 } else if (period == ReportPeriod.week) {
-                  label = DateFormat('EEE', 'id').format(date).substring(0, 3);
+                  label = DateFormat('EEE', 'id').format(date);
                 } else if (period == ReportPeriod.month) {
                   label = date.day.toString();
                 } else {
-                  label =
-                      DateFormat('MMM', 'id').format(date).substring(0, 3);
+                  label = DateFormat('MMM', 'id').format(date).substring(0, 3);
                 }
 
                 return Padding(
@@ -667,8 +834,9 @@ class _SalesChart extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontFamily: fontType,
-                      fontSize: 10,
-                      color: Colors.grey.shade600,
+                      fontSize: 11,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 );
@@ -676,23 +844,61 @@ class _SalesChart extends StatelessWidget {
             ),
           ),
         ),
-        borderData: FlBorderData(show: false),
+
+        borderData: FlBorderData(
+          show: true,
+          border: Border(
+            left: BorderSide(color: Colors.grey.shade300, width: 1),
+            bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+          ),
+        ),
+
         lineBarsData: [
           LineChartBarData(
             spots: spots,
             isCurved: true,
+            curveSmoothness: 0.3,
             color: primaryGreenColor,
             barWidth: 3,
             isStrokeCapRound: true,
-            dotData: const FlDotData(show: false),
-            belowBarData:
-            BarAreaData(show: true, color: primaryGreenColor.withOpacity(0.1)),
+            // 🆕 Tampilkan dot di setiap titik
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) {
+                return FlDotCirclePainter(
+                  radius: 4,
+                  color: Colors.white,
+                  strokeWidth: 2,
+                  strokeColor: primaryGreenColor,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [
+                  primaryGreenColor.withOpacity(0.2),
+                  primaryGreenColor.withOpacity(0.05),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
         ],
+
         minY: 0,
-        maxY: maxY * 1.2,
+        maxY: maxY * 1.15, // Lebih proporsional
       ),
     );
+  }
+
+  // 🆕 Helper untuk interval label bawah
+  double _getBottomInterval(int dataLength) {
+    if (dataLength <= 7) return 1;
+    if (dataLength <= 14) return 2;
+    if (dataLength <= 31) return 3;
+    return 5;
   }
 }
 
@@ -702,9 +908,9 @@ class _SalesChart extends StatelessWidget {
 class _TransactionCard extends StatelessWidget {
   final DateTime date;
   final int transactionCount;
-  final int totalRevenue;
-  final int totalProfit;
-  final String Function(int) formatCurrency;
+  final double totalRevenue;
+  final double totalProfit;
+  final String Function(double) formatCurrency;
   final VoidCallback onTap;
 
   const _TransactionCard({
@@ -738,7 +944,6 @@ class _TransactionCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // LEFT SIDE - Date & Transaction Count
             Expanded(
               flex: 3,
               child: Column(
@@ -747,11 +952,10 @@ class _TransactionCard extends StatelessWidget {
                   Text(
                     '*tekan untuk melihat detail',
                     style: TextStyle(
-                      fontFamily: fontType,
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w600
-                    ),
+                        fontFamily: fontType,
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -802,21 +1006,17 @@ class _TransactionCard extends StatelessWidget {
                         fontFamily: fontType,
                         fontSize: 12,
                         color: Colors.black,
-                        fontWeight: FontWeight.w700
-                    ),
+                        fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
             ),
-
-            // RIGHT SIDE - Revenue & Profit
             Expanded(
               flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Pendapatan
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -826,8 +1026,7 @@ class _TransactionCard extends StatelessWidget {
                             fontFamily: fontType,
                             fontSize: 12,
                             color: Colors.black,
-                            fontWeight: FontWeight.w600
-                        ),
+                            fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -841,8 +1040,7 @@ class _TransactionCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8), // Atur jarak antara Pendapatan & Keuntungan
-                  // Keuntungan
+                  const SizedBox(height: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -852,8 +1050,7 @@ class _TransactionCard extends StatelessWidget {
                             fontFamily: fontType,
                             fontSize: 12,
                             color: Colors.black,
-                            fontWeight: FontWeight.w600
-                        ),
+                            fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -870,11 +1067,9 @@ class _TransactionCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Arrow Icon
             const SizedBox(width: 12),
             Icon(
-              Icons.arrow_forward_ios, // ✅ Ganti jadi arrow biasa
+              Icons.arrow_forward_ios,
               size: 16,
               color: Colors.grey.shade400,
             ),

@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_mobile/data/models/transaction_model.dart';
+import 'package:pos_mobile/data/models/transaction_sales_report_model.dart';
+import '../../../../../../blocs/company/company_cubit.dart';
 import '../../../../../../core/theme/theme.dart';
+import '../../../../../../data/models/company_model.dart';
 import '../../../../../widgets/custom_app_bar.dart';
-import '../../../../../widgets/transaction_receipt.dart';
+import '../../../../../widgets/floating_message.dart';
+import '../history_transaction_receipt.dart';
 
 class TransactionDetailPage extends StatelessWidget {
   final DateTime date;
-  final List<TransactionModel> transactions;
-  final String Function(int) formatCurrency;
+  final List<TransactionReport>? transactions;
+  final String Function(double) formatCurrency;
 
   const TransactionDetailPage({
     Key? key,
     required this.date,
-    required this.transactions,
+    this.transactions,
     required this.formatCurrency,
   }) : super(key: key);
 
@@ -24,26 +28,65 @@ class TransactionDetailPage extends StatelessWidget {
       appBar: CustomAppBar(
         title: 'Detail Transaksi - ${DateFormat('dd MMM yyyy').format(date)}',
       ),
-      body: ListView.builder(
+      body: transactions == null || transactions!.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak ada transaksi',
+              style: TextStyle(
+                fontFamily: fontType,
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      )
+          : ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: transactions.length,
+        itemCount: transactions!.length,
         itemBuilder: (context, index) {
-          final transaction = transactions[index];
+          final transaction = transactions![index];
           return GestureDetector(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TransactionReceiptPage(
-                    transaction: transaction,
-                  ),
-                ),
-              );
+              // Navigate ke detail transaksi jika diperlukan
+              _showTransactionDetail(context, transaction);
             },
             child: _TransactionDetailCard(
               transaction: transaction,
               formatCurrency: formatCurrency,
             ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showTransactionDetail(BuildContext context, TransactionReport transaction) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) {
+          return _TransactionDetailBottomSheet(
+            transaction: transaction,
+            formatCurrency: formatCurrency,
+            scrollController: scrollController,
           );
         },
       ),
@@ -55,8 +98,8 @@ class TransactionDetailPage extends StatelessWidget {
 // SECTION: TRANSACTION DETAIL CARD
 // ===================================================================
 class _TransactionDetailCard extends StatelessWidget {
-  final TransactionModel transaction;
-  final String Function(int) formatCurrency;
+  final TransactionReport transaction;
+  final String Function(double) formatCurrency;
 
   const _TransactionDetailCard({
     required this.transaction,
@@ -72,6 +115,13 @@ class _TransactionDetailCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,12 +130,14 @@ class _TransactionDetailCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                transaction.id,
-                style: const TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  transaction.kodeTransaksi,
+                  style: const TextStyle(
+                    fontFamily: fontType,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Container(
@@ -95,7 +147,7 @@ class _TransactionDetailCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  transaction.paymentMethod,
+                  transaction.metode,
                   style: const TextStyle(
                     fontFamily: fontType,
                     fontSize: 11,
@@ -115,7 +167,7 @@ class _TransactionDetailCard extends StatelessWidget {
               Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
               const SizedBox(width: 4),
               Text(
-                DateFormat('HH:mm').format(transaction.transactionDate),
+                _formatTime(transaction.tanggal),
                 style: TextStyle(
                   fontFamily: fontType,
                   fontSize: 12,
@@ -126,27 +178,47 @@ class _TransactionDetailCard extends StatelessWidget {
           ),
 
           // CUSTOMER
-          if (transaction.customer != null) ...[
+          if (transaction.pelanggan != 'Tanpa pelanggan') ...[
             const SizedBox(height: 4),
             Row(
               children: [
                 Icon(Icons.person, size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
-                Text(
-                  transaction.customer!.name,
-                  style: TextStyle(
-                    fontFamily: fontType,
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+                Expanded(
+                  child: Text(
+                    transaction.pelanggan,
+                    style: TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ],
 
+          // KASIR
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 4),
+              Text(
+                'Kasir: ${transaction.kasir}',
+                style: TextStyle(
+                  fontFamily: fontType,
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+
           const Divider(height: 20),
 
-          // TOTAL DAN ITEM
+          // TOTAL DAN KEUNTUNGAN
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -154,7 +226,7 @@ class _TransactionDetailCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Pendapatan',
+                    'Total Penjualan',
                     style: TextStyle(
                       fontFamily: fontType,
                       fontSize: 12,
@@ -163,7 +235,7 @@ class _TransactionDetailCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    formatCurrency(transaction.totalPayment),
+                    formatCurrency(transaction.totalPenjualan),
                     style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 16,
@@ -186,7 +258,7 @@ class _TransactionDetailCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    formatCurrency(transaction.totalProfit),
+                    formatCurrency(transaction.keuntungan),
                     style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 14,
@@ -199,32 +271,275 @@ class _TransactionDetailCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 8),
+          // INFO TAMBAHAN
+          if (transaction.totalDiskon > 0 || transaction.biayaLain > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (transaction.totalDiskon > 0)
+                  Text(
+                    'Diskon: ${formatCurrency(transaction.totalDiskon)}',
+                    style: TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                if (transaction.biayaLain > 0)
+                  Text(
+                    'Biaya Lain: ${formatCurrency(transaction.biayaLain)}',
+                    style: TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
-          // INFO ITEM
+  String _formatTime(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('HH:mm').format(dateTime);
+    } catch (e) {
+      return '-';
+    }
+  }
+}
+
+// ===================================================================
+// SECTION: TRANSACTION DETAIL BOTTOM SHEET
+// ===================================================================
+class _TransactionDetailBottomSheet extends StatelessWidget {
+  final TransactionReport transaction;
+  final String Function(double) formatCurrency;
+  final ScrollController scrollController;
+
+  const _TransactionDetailBottomSheet({
+    required this.transaction,
+    required this.formatCurrency,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: ListView(
+        controller: scrollController,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${transaction.items.length} item • ',
+                'Detail Transaksi',
                 style: TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
                 ),
               ),
-              Text(
-                '${transaction.items.fold<int>(0, (sum, item) => sum + item.quantity)} qty',
-                style: TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                ),
+              IconButton(
+                onPressed: () async {
+                  Navigator.pop(context); // Tutup modal dulu
+
+                  // ✅ Ambil data company dari CompanyCubit
+                  final companyCubit = context.read<CompanyCubit>();
+                  final companyState = companyCubit.state;
+
+                  Company? company;
+
+                  if (companyState is CompanyLoaded) {
+                    company = companyState.company;
+                  } else {
+                    // Jika belum loaded, load dulu
+                    await companyCubit.loadCompany();
+                    final newState = companyCubit.state;
+                    if (newState is CompanyLoaded) {
+                      company = newState.company;
+                    }
+                  }
+
+                  if (company == null) {
+                    if (context.mounted) {
+                      FloatingMessage.show(
+                        context,
+                        message: 'Data toko tidak tersedia',
+                        textOnly: true,
+                        backgroundColor: Colors.red,
+                      );
+                    }
+                    return;
+                  }
+
+                  // ✅ Kirim company sebagai parameter
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HistoryTransactionReceiptPage(
+                          transactionId: transaction.id,
+                          transactionCode: transaction.kodeTransaksi,
+                          company: company!, // ✅ Kirim data company
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.receipt_long),
+                color: primaryGreenColor,
+                tooltip: 'Lihat Receipt Lengkap',
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            transaction.kodeTransaksi,
+            style: TextStyle(
+              fontFamily: fontType,
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const Divider(height: 24),
+
+          // Info Grid
+          _buildInfoRow('Tanggal', _formatDate(transaction.tanggal)),
+          _buildInfoRow('Waktu', _formatTime(transaction.tanggal)),
+          _buildInfoRow('Kasir', transaction.kasir),
+          _buildInfoRow('Pelanggan', transaction.pelanggan),
+          if (transaction.teleponPelanggan != '-')
+            _buildInfoRow('Telepon', transaction.teleponPelanggan),
+          _buildInfoRow('Metode Pembayaran', transaction.metode),
+
+          const Divider(height: 24),
+
+          // Financial Details
+          _buildFinancialRow('Total Penjualan', transaction.totalPenjualan, isPrimary: true),
+          if (transaction.totalDiskon > 0)
+            _buildFinancialRow('Diskon', transaction.totalDiskon, isNegative: true),
+          if (transaction.biayaLain > 0)
+            _buildFinancialRow(
+              transaction.namaBiayaLain ?? 'Biaya Lain',
+              transaction.biayaLain,
+            ),
+          _buildFinancialRow('Bayar', transaction.bayar),
+          _buildFinancialRow('Kembalian', transaction.kembalian),
+
+          const Divider(height: 24),
+
+          _buildFinancialRow('Keuntungan', transaction.keuntungan, isProfit: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: fontType,
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: fontType,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildFinancialRow(
+      String label,
+      double value, {
+        bool isPrimary = false,
+        bool isProfit = false,
+        bool isNegative = false,
+      }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: fontType,
+              fontSize: isPrimary || isProfit ? 14 : 13,
+              fontWeight: isPrimary || isProfit ? FontWeight.w600 : FontWeight.normal,
+              color: isPrimary || isProfit ? Colors.black : Colors.grey.shade600,
+            ),
+          ),
+          Text(
+            '${isNegative ? '-' : ''}${formatCurrency(value)}',
+            style: TextStyle(
+              fontFamily: fontType,
+              fontSize: isPrimary || isProfit ? 16 : 13,
+              fontWeight: isPrimary || isProfit ? FontWeight.w700 : FontWeight.w600,
+              color: isProfit
+                  ? const Color(0xFF2196F3)
+                  : isPrimary
+                  ? primaryGreenColor
+                  : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('dd MMM yyyy').format(dateTime);
+    } catch (e) {
+      return '-';
+    }
+  }
+
+  String _formatTime(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('HH:mm').format(dateTime);
+    } catch (e) {
+      return '-';
+    }
   }
 }

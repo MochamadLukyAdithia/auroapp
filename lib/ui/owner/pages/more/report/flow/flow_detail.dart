@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:pos_mobile/data/models/transaction_sales_report_model.dart';
+import '../../../../../../blocs/company/company_cubit.dart';
 import '../../../../../../core/theme/theme.dart';
-import '../../../../../../data/models/transaction_model.dart';
+import '../../../../../../data/models/company_model.dart';
 import '../../../../../../data/models/finance_model.dart';
 import '../../../../../widgets/custom_app_bar.dart';
 import '../../../../../widgets/finance_receipt.dart';
-import '../../../../../widgets/transaction_receipt.dart';
+import '../../../../../widgets/floating_message.dart';
+import '../history_transaction_receipt.dart';
 
 class FlowDetailPage extends StatelessWidget {
   final DateTime date;
-  final List<TransactionModel> transactions;
+  final List<TransactionReport> transactions;
   final List<Finance> finances;
 
   const FlowDetailPage({
@@ -34,11 +38,11 @@ class FlowDetailPage extends StatelessWidget {
     // Tambahkan transaksi penjualan
     for (var transaction in transactions) {
       items.add({
-        'date': transaction.transactionDate,
+        'date': DateTime.parse(transaction.tanggal),
         'type': 'sales',
-        'description': 'Transaksi',
-        'amount': transaction.totalPayment,
-        'profit': transaction.totalProfit,
+        'description': 'Transaksi #${transaction.kodeTransaksi}',
+        'amount': transaction.bayar.toInt(),
+        'profit': transaction.keuntungan.toInt(),
         'data': transaction,
       });
     }
@@ -49,7 +53,7 @@ class FlowDetailPage extends StatelessWidget {
         'date': finance.date,
         'type': finance.type == FinanceType.income ? 'income' : 'expense',
         'description': finance.name,
-        'amount': finance.amount,
+        'amount': (finance.amount is double) ? (finance.amount as double).toInt() : finance.amount as int,
         'notes': finance.description,
         'data': finance,
       });
@@ -59,13 +63,13 @@ class FlowDetailPage extends StatelessWidget {
     items.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     // Hitung summary untuk hari ini
-    final totalSales = transactions.fold<int>(0, (sum, t) => sum + t.totalPayment);
+    final totalSales = transactions.fold<double>(0, (sum, t) => sum + t.bayar);
     final totalIncome = finances
         .where((f) => f.type == FinanceType.income)
-        .fold<int>(0, (sum, f) => sum + f.amount.toInt());
+        .fold<double>(0, (sum, f) => sum + f.amount);
     final totalExpense = finances
         .where((f) => f.type == FinanceType.outcome)
-        .fold<int>(0, (sum, f) => sum + f.amount.toInt());
+        .fold<double>(0, (sum, f) => sum + f.amount);
     final totalRevenue = totalSales + totalIncome;
     final netIncome = totalRevenue - totalExpense;
 
@@ -137,9 +141,9 @@ class FlowDetailPage extends StatelessWidget {
   }
 
   Widget _buildSummaryCard({
-    required int totalRevenue,
-    required int totalExpense,
-    required int netIncome,
+    required double totalRevenue,
+    required double totalExpense,
+    required double netIncome,
     required NumberFormat currencyFormat,
   }) {
     return Container(
@@ -318,7 +322,9 @@ class FlowDetailPage extends StatelessWidget {
               final date = item['date'] as DateTime;
               final type = item['type'] as String;
               final description = item['description'] as String;
-              final amount = item['amount'] as int;
+              final amount = (item['amount'] is double)
+                  ? (item['amount'] as double).toInt()
+                  : item['amount'] as int;
 
               Color amountColor;
               IconData icon;
@@ -461,114 +467,226 @@ class FlowDetailPage extends StatelessWidget {
     final type = item['type'] as String;
 
     if (type == 'sales') {
-      // Navigate ke TransactionReceiptPage
-      final transaction = item['data'] as TransactionModel;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TransactionReceiptPage(
-            transaction: transaction,
-          ),
-        ),
-      );
+      final transaction = item['data'] as TransactionReport;
+      _showTransactionReportDialog(context, transaction);
     } else {
-      // Navigate ke FinanceReceiptPage
       final finance = item['data'] as Finance;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => FinanceReceiptPage(
-            finance: finance,
+
+      final companyCubit = context.read<CompanyCubit>();
+      final companyState = companyCubit.state;
+
+      if (companyState is CompanyLoaded) {
+        final company = companyState.company; // ✅ Di sini udah non-nullable
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FinanceReceiptPage(
+              finance: finance,
+              company: company, // ✅ Pasti non-null
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        FloatingMessage.show(
+          context,
+          message: 'Data toko tidak tersedia',
+          textOnly: true,
+          backgroundColor: Colors.red,
+        );
+      }
     }
   }
 
-  List<Widget> _buildSalesDetail(
-      Map<String, dynamic> item,
-      NumberFormat currencyFormat,
-      DateFormat dateTimeFormat,
-      ) {
-    final transaction = item['data'] as TransactionModel;
+  void _showTransactionReportDialog(BuildContext context, TransactionReport transaction) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
 
-    return [
-      _detailRow('Jenis', 'Transaksi Penjualan'),
-      const SizedBox(height: 12),
-      _detailRow('Tanggal', dateTimeFormat.format(transaction.transactionDate)),
-      const SizedBox(height: 12),
-      _detailRow('Total Pembayaran', currencyFormat.format(transaction.totalPayment)),
-      const SizedBox(height: 12),
-      _detailRow('Keuntungan', currencyFormat.format(transaction.totalProfit)),
-      if (transaction.discount > 0) ...[
-        const SizedBox(height: 12),
-        _detailRow('Diskon', currencyFormat.format(transaction.discount)),
-      ],
-      if (transaction.customer != null) ...[
-        const SizedBox(height: 12),
-        _detailRow('Pelanggan', transaction.customer!.name),
-      ],
-      const SizedBox(height: 12),
-      _detailRow('Metode Bayar', transaction.paymentMethod),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Detail Transaksi',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () async {
+                      Navigator.pop(context); // Tutup modal dulu
 
-      const SizedBox(height: 16),
-      const Divider(),
-      const SizedBox(height: 12),
+                      // ✅ Ambil data company dari CompanyCubit
+                      final companyCubit = context.read<CompanyCubit>();
+                      final companyState = companyCubit.state;
 
-      Text(
-        'Item yang Dibeli (${transaction.items.length})',
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
+                      Company? company;
+
+                      if (companyState is CompanyLoaded) {
+                        company = companyState.company;
+                      } else {
+                        // Jika belum loaded, load dulu
+                        await companyCubit.loadCompany();
+                        final newState = companyCubit.state;
+                        if (newState is CompanyLoaded) {
+                          company = newState.company;
+                        }
+                      }
+
+                      if (company == null) {
+                        if (context.mounted) {
+                          FloatingMessage.show(
+                            context,
+                            message: 'Data toko tidak tersedia',
+                            textOnly: true,
+                            backgroundColor: Colors.red,
+                          );
+                        }
+                        return;
+                      }
+
+                      // ✅ Kirim company sebagai parameter
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HistoryTransactionReceiptPage(
+                              transactionId: transaction.id,
+                              transactionCode: transaction.kodeTransaksi,
+                              company: company!, // ✅ Kirim data company
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.receipt_long),
+                    color: primaryGreenColor,
+                    tooltip: 'Lihat Receipt Lengkap',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Detail Info
+              _detailRow('Kode Transaksi', transaction.kodeTransaksi),
+              const SizedBox(height: 12),
+              _detailRow('Tanggal', DateFormat('dd MMMM yyyy HH:mm', 'id_ID').format(
+                  DateTime.parse(transaction.tanggal)
+              )),
+              const SizedBox(height: 12),
+              _detailRow('Kasir', transaction.kasir),
+              const SizedBox(height: 12),
+              _detailRow('Pelanggan', transaction.pelanggan),
+              const SizedBox(height: 12),
+              _detailRow('Metode Pembayaran', transaction.metode),
+
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 20),
+
+              // Financial Info
+              _detailRow('Total Penjualan', currencyFormat.format(transaction.totalPenjualan)),
+              const SizedBox(height: 12),
+              _detailRow('Diskon', currencyFormat.format(transaction.totalDiskon)),
+              const SizedBox(height: 12),
+              _detailRow('Bayar', currencyFormat.format(transaction.bayar)),
+              const SizedBox(height: 12),
+              _detailRow('Kembalian', currencyFormat.format(transaction.kembalian)),
+              if (transaction.biayaLain > 0) ...[
+                const SizedBox(height: 12),
+                _detailRow(
+                  transaction.namaBiayaLain ?? 'Biaya Lain',
+                  currencyFormat.format(transaction.biayaLain),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 20),
+
+              // Profit
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Keuntungan',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  Text(
+                    currencyFormat.format(transaction.keuntungan),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: primaryGreenColor,
+                    ),
+                  ),
+                ],
+              ),
+
+              // const SizedBox(height: 24),
+              // SizedBox(
+              //   width: double.infinity,
+              //   child: ElevatedButton(
+              //     onPressed: () => Navigator.pop(context),
+              //     style: ElevatedButton.styleFrom(
+              //       backgroundColor: primaryGreenColor,
+              //       padding: const EdgeInsets.symmetric(vertical: 14),
+              //       shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(10),
+              //       ),
+              //     ),
+              //     child: const Text(
+              //       'Tutup',
+              //       style: TextStyle(
+              //         fontSize: 16,
+              //         fontWeight: FontWeight.w600,
+              //         color: Colors.white,
+              //       ),
+              //     ),
+              //   ),
+              // ),
+            ],
+          ),
         ),
       ),
-      const SizedBox(height: 8),
-      ...transaction.items.map((item) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(
-                '${item.productName} (${item.quantity}x)',
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
-            Text(
-              currencyFormat.format(item.totalPrice),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      )),
-    ];
-  }
-
-  List<Widget> _buildFinanceDetail(
-      Map<String, dynamic> item,
-      NumberFormat currencyFormat,
-      DateFormat dateTimeFormat,
-      String type,
-      ) {
-    final finance = item['data'] as Finance;
-    final typeLabel = type == 'income' ? 'Pemasukan Lain' : 'Pengeluaran';
-
-    return [
-      _detailRow('Jenis', typeLabel),
-      const SizedBox(height: 12),
-      _detailRow('Nama', finance.name),
-      const SizedBox(height: 12),
-      _detailRow('Jumlah', currencyFormat.format(finance.amount)),
-      const SizedBox(height: 12),
-      _detailRow('Tanggal', dateTimeFormat.format(finance.date)),
-      if (finance.description != null && finance.description!.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        _detailRow('Catatan', finance.description!),
-      ],
-    ];
+    );
   }
 
   Widget _detailRow(String label, String value) {

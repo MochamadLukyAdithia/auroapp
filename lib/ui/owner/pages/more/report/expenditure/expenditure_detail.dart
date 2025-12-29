@@ -26,7 +26,7 @@ class ExpenditureDetailPage extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: CustomAppBar(
+      appBar: const CustomAppBar(
         title: 'Detail Pengeluaran',
       ),
       body: Column(
