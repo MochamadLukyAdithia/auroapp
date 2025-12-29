@@ -31,6 +31,7 @@ class _ProductCategoryPageState extends State<ProductCategoryPage> with SingleTi
   late TabController _tabController;
   bool _isFabProcessing = false;
   int _currentTabIndex = 0;
+  bool _isTabAnimating = false;
 
   @override
   void initState() {
@@ -44,10 +45,16 @@ class _ProductCategoryPageState extends State<ProductCategoryPage> with SingleTi
   }
 
   void _handleTabChange() {
-    if (!_tabController.indexIsChanging) {  // ✅ Hanya update setelah animasi selesai
+    // ✅ Track animasi tab
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        _isTabAnimating = true;
+      });
+    } else {
       if (_tabController.index != _currentTabIndex) {
         setState(() {
           _currentTabIndex = _tabController.index;
+          _isTabAnimating = false;
         });
       }
     }
@@ -86,7 +93,7 @@ class _ProductCategoryPageState extends State<ProductCategoryPage> with SingleTi
                 padding: const EdgeInsets.only(bottom: 80.0),
                 child: FloatingActionButton(
                   key: ValueKey('fab_$_currentTabIndex'),  // ✅ Ubah dari heroTag ke key
-                  onPressed: _isFabProcessing ? null : () async {
+                  onPressed: (_isFabProcessing || _isTabAnimating) ? null : () async {
                     setState(() => _isFabProcessing = true);
                     final currentTab = _currentTabIndex;
 
@@ -137,6 +144,7 @@ class _ProductCategoryPageState extends State<ProductCategoryPage> with SingleTi
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: const [
           ProductSection(),
           CategorySection(),
@@ -156,13 +164,13 @@ class ProductSection extends StatelessWidget {
       listener: (context, state) {
         if (state is ProductActionSuccess) {
           context.read<ProductBloc>().add(const LoadProducts());
-          FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+          FloatingMessage.show(context, message: state.message, backgroundColor: primaryGreenColor);
         }
         if (state is ProductLoaded) {
           context.read<ProductSearchCubit>().setProducts(state.products);
         }
         if (state is ProductError) {
-          FloatingMessage.show(context, message: state.message, backgroundColor: primaryBlueColor);
+          FloatingMessage.show(context, message: state.message, backgroundColor: Colors.red);
         }
       },
       child: BlocBuilder<ProductBloc, ProductState>(
@@ -174,21 +182,7 @@ class ProductSection extends StatelessWidget {
           } else if (state is ProductLoaded) {
             return const ProductListSection();
           } else if (state is ProductError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(state.message, style: const TextStyle(color: Colors.red)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<ProductBloc>().add(const LoadProducts());
-                    },
-                    child: const Text('Coba Lagi'),
-                  ),
-                ],
-              ),
-            );
+            context.read<ProductBloc>().add(const LoadProducts());
           }
           return const EmptyProductSection();
         },
@@ -420,7 +414,7 @@ class _ProductListSectionState extends State<ProductListSection> {
     if (stock == 0) {
       stockColor = Colors.red;
       stockText = 'Habis';
-    } else if (stock <= 10) {
+    } else if (stock! <= 5) {
       stockColor = Colors.orange;
       stockText = 'Stok: $stock';
     } else {
@@ -1244,7 +1238,6 @@ class CategoryItemCard extends StatelessWidget {
                       FloatingMessage.show(
                         context,
                         message: 'Kategori "${category.categoryName}" berhasil dihapus',
-                        textOnly: true,
                         backgroundColor: primaryGreenColor,
                       );
                     },
@@ -1316,6 +1309,11 @@ class _UpdateCategoryDialogState extends State<UpdateCategoryDialog> {
       );
 
       context.read<CategoryBloc>().add(UpdateCategory(category: updatedCategory));
+      FloatingMessage.show(
+        context,
+        message: 'Kategori berhasil dipebarui',
+        backgroundColor: primaryGreenColor,
+      );
       Navigator.pop(context, true);
     }
   }
