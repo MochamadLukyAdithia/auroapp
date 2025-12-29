@@ -8,7 +8,7 @@ class TransactionModel extends Equatable {
   final String transactionNumber;
   final DateTime transactionDate;
   final double subtotal;
-  final double transactionDiscount;
+  final double? transactionDiscount;
   final double transactionTax;
   final double totalTransaction;
   final String? nameOtherCost;
@@ -68,16 +68,16 @@ class TransactionModel extends Equatable {
       id: json['id'],
       transactionNumber: json['transaction_number'],
       transactionDate: DateTime.parse(json['transaction_date']),
-      subtotal: (json['subtotal'] ?? 0).toDouble(),
-      transactionDiscount: (json['transaction_discount'] ?? 0).toDouble(),
-      transactionTax: (json['transaction_tax'] ?? 0).toDouble(),
-      totalTransaction: (json['total_transaction'] ?? 0).toDouble(),
+      subtotal: _parseDouble(json['subtotal']),
+      transactionDiscount: _parseDouble(json['transaction_discount']),
+      transactionTax: _parseDouble(json['transaction_tax']),
+      totalTransaction: _parseDouble(json['total_transaction']),
       nameOtherCost: json['name_other_cost'],
-      otherCost: (json['other_cost'] ?? 0).toDouble(),
-      totalPayment: (json['total_payment'] ?? 0).toDouble(),
-      changeAmount: (json['change_amount'] ?? 0).toDouble(),
+      otherCost: _parseDouble(json['other_cost']),
+      totalPayment: _parseDouble(json['total_payment']),
+      changeAmount: _parseDouble(json['change_amount']),
       transactionDescription: json['transaction_description'],
-      totalProfit: (json['total_profit'] ?? 0).toDouble(),
+      totalProfit: _parseDouble(json['total_profit']),
       customer: json['customer'] != null
           ? Customer.fromJson(json['customer'])
           : null,
@@ -88,6 +88,16 @@ class TransactionModel extends Equatable {
       companyPaymentMethod:
       CompanyPaymentMethodModel.fromJson(json['company_payment_method']),
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
   }
 
   Map<String, dynamic> toJson() {
@@ -159,13 +169,23 @@ class DetailTransactionModel extends Equatable {
       transactionId: json['transaction_id'],
       productId: json['product_id'],
       quantity: json['quantity'],
-      unitPrice: (json['unit_price'] ?? 0).toDouble(),
-      costPrice: (json['cost_price'] ?? 0).toDouble(),
-      discount: (json['discount'] ?? 0).toDouble(),
-      subtotal: (json['subtotal'] ?? 0).toDouble(),
-      itemProfit: (json['item_profit'] ?? 0).toDouble(),
+      unitPrice: _parseDouble(json['unit_price']),
+      costPrice: _parseDouble(json['cost_price']),
+      discount: _parseDouble(json['discount']),
+      subtotal: _parseDouble(json['subtotal']),
+      itemProfit: _parseDouble(json['item_profit']),
       product: ProductModel.fromJson(json['product']),
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
   }
 
   Map<String, dynamic> toJson() {
@@ -186,22 +206,22 @@ class DetailTransactionModel extends Equatable {
 
 class UserModel extends Equatable {
   final int id;
-  final String username;
+  final String fullname;
   final String email;
 
   const UserModel({
     required this.id,
-    required this.username,
+    required this.fullname,
     required this.email,
   });
 
   @override
-  List<Object?> get props => [id, username, email];
+  List<Object?> get props => [id, fullname, email];
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
-      username: json['username'],
+      fullname: json['full_name'],
       email: json['email'],
     );
   }
@@ -209,7 +229,7 @@ class UserModel extends Equatable {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'username': username,
+      'full_name': fullname,
       'email': email,
     };
   }
@@ -257,14 +277,14 @@ class PaymentMethodModel extends Equatable {
   factory PaymentMethodModel.fromJson(Map<String, dynamic> json) {
     return PaymentMethodModel(
       id: json['id'],
-      paymentMethodName: json['payment_method_name'],
+      paymentMethodName: json['payment_methods_name'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'payment_method_name': paymentMethodName,
+      'payment_methods_name': paymentMethodName,
     };
   }
 }
