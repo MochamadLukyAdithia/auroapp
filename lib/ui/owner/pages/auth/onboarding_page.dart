@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../blocs/onboarding/onboarding_cubit.dart';
 import '../../../../blocs/onboarding/onboarding_state.dart';
 import '../../../../core/theme/theme.dart';
@@ -17,14 +17,50 @@ class OnboardingPage extends StatelessWidget {
     return BlocProvider(
       create: (context) => OnboardingCubit(
         context.read<CompanyRepository>(),
+        context.read<SharedPreferences>(),
       ),
       child: const _OnboardingView(),
     );
   }
 }
 
-class _OnboardingView extends StatelessWidget {
+class _OnboardingView extends StatefulWidget {
   const _OnboardingView();
+
+  @override
+  State<_OnboardingView> createState() => _OnboardingViewState();
+}
+
+class _OnboardingViewState extends State<_OnboardingView> {
+  late TextEditingController _nameController;
+  late TextEditingController _addressController;
+  late TextEditingController _phoneController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize controllers kosong dulu
+    _nameController = TextEditingController();
+    _addressController = TextEditingController();
+    _phoneController = TextEditingController();
+
+    // Set nilai controller setelah draft di-load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = context.read<OnboardingCubit>().state;
+      _nameController.text = state.storeName;
+      _addressController.text = state.storeAddress;
+      _phoneController.text = state.storePhone;
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +70,7 @@ class _OnboardingView extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Setup toko berhasil!'),
-              backgroundColor: Colors.green,
+              backgroundColor: primaryGreenColor,
               behavior: SnackBarBehavior.floating,
               duration: Duration(seconds: 2),
             ),
@@ -58,8 +94,17 @@ class _OnboardingView extends StatelessWidget {
           context.read<OnboardingCubit>().resetStatus();
         }
       },
-      child: const PopScope(
+      child: PopScope(
         canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+
+          // Konfirmasi sebelum keluar
+          final shouldPop = await _showExitConfirmation(context);
+          if (shouldPop == true && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
         child: Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
@@ -69,19 +114,19 @@ class _OnboardingView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 20),
-                    _OnboardingHeader(),
-                    SizedBox(height: 40),
-                    _StoreLogoSection(),
-                    SizedBox(height: 32),
-                    _StoreNameField(),
-                    SizedBox(height: 24),
-                    _StoreAddressField(),
-                    SizedBox(height: 24),
-                    _StorePhoneField(),
-                    SizedBox(height: 40),
-                    _SubmitButton(),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                    const _OnboardingHeader(),
+                    const SizedBox(height: 40),
+                    const _StoreLogoSection(),
+                    const SizedBox(height: 32),
+                    _StoreNameField(controller: _nameController),
+                    const SizedBox(height: 24),
+                    _StoreAddressField(controller: _addressController),
+                    const SizedBox(height: 24),
+                    _StorePhoneField(controller: _phoneController),
+                    const SizedBox(height: 40),
+                    const _SubmitButton(),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -91,9 +136,31 @@ class _OnboardingView extends StatelessWidget {
       ),
     );
   }
+
+  Future<bool?> _showExitConfirmation(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluar dari Setup?'),
+        content: const Text(
+          'Data yang sudah diisi akan disimpan. Anda bisa melanjutkan setup nanti setelah login kembali.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, Keluar'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// ---------------- Header Section ----------------
+// ... Header tetap sama ...
 class _OnboardingHeader extends StatelessWidget {
   const _OnboardingHeader();
 
@@ -136,8 +203,7 @@ class _OnboardingHeader extends StatelessWidget {
   }
 }
 
-// ---------------- Store Logo Section ----------------
-// ---------------- Store Logo Section ----------------
+// ... Logo section tetap sama ...
 class _StoreLogoSection extends StatelessWidget {
   const _StoreLogoSection();
 
@@ -148,7 +214,7 @@ class _StoreLogoSection extends StatelessWidget {
         return Column(
           children: [
             const Text(
-              'Logo Toko',
+              'Logo Toko*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -185,9 +251,11 @@ class _StoreLogoSection extends StatelessWidget {
   }
 }
 
-// ---------------- Store Name Field ----------------
+// 👇 Update field-field dengan controller
 class _StoreNameField extends StatelessWidget {
-  const _StoreNameField();
+  final TextEditingController controller;
+
+  const _StoreNameField({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +265,7 @@ class _StoreNameField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Nama Toko',
+              'Nama Toko*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -207,6 +275,7 @@ class _StoreNameField extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: controller,
               onChanged: (value) {
                 context.read<OnboardingCubit>().storeNameChanged(value);
               },
@@ -258,9 +327,10 @@ class _StoreNameField extends StatelessWidget {
   }
 }
 
-// ---------------- Store Address Field ----------------
 class _StoreAddressField extends StatelessWidget {
-  const _StoreAddressField();
+  final TextEditingController controller;
+
+  const _StoreAddressField({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +340,7 @@ class _StoreAddressField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Alamat Toko',
+              'Alamat Toko*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -280,6 +350,7 @@ class _StoreAddressField extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: controller,
               onChanged: (value) {
                 context.read<OnboardingCubit>().storeAddressChanged(value);
               },
@@ -332,9 +403,10 @@ class _StoreAddressField extends StatelessWidget {
   }
 }
 
-// ---------------- Store Phone Field ----------------
 class _StorePhoneField extends StatelessWidget {
-  const _StorePhoneField();
+  final TextEditingController controller;
+
+  const _StorePhoneField({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +416,7 @@ class _StorePhoneField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Nomor Telepon Toko',
+              'Nomor Telepon Toko*',
               style: TextStyle(
                 fontFamily: fontType,
                 fontSize: 16,
@@ -354,6 +426,7 @@ class _StorePhoneField extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: controller,
               onChanged: (value) {
                 context.read<OnboardingCubit>().storePhoneChanged(value);
               },
@@ -369,7 +442,7 @@ class _StorePhoneField extends StatelessWidget {
                   color: Colors.grey[400],
                   fontSize: 14,
                 ),
-                errorText: state!.storePhoneError,
+                errorText: state.storePhoneError,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
@@ -406,7 +479,7 @@ class _StorePhoneField extends StatelessWidget {
   }
 }
 
-// ---------------- Submit Button ----------------
+// 👇 Update button dengan retry
 class _SubmitButton extends StatelessWidget {
   const _SubmitButton();
 
@@ -415,6 +488,7 @@ class _SubmitButton extends StatelessWidget {
     return BlocBuilder<OnboardingCubit, OnboardingState>(
       builder: (context, state) {
         final isLoading = state.status == OnboardingStatus.loading;
+        final isFailure = state.status == OnboardingStatus.failure;
 
         return SizedBox(
           width: double.infinity,
@@ -447,7 +521,7 @@ class _SubmitButton extends StatelessWidget {
                 strokeWidth: 2,
               ),
             )
-                : const Text('Lanjutkan'),
+                : Text(isFailure ? 'Coba Lagi' : 'Lanjutkan'),
           ),
         );
       },
