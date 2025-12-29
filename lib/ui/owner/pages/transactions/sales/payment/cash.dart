@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:pos_mobile/route/route.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import '../../../../../../blocs/history_stock/stock_bloc.dart';
+import '../../../../../../blocs/product/product_bloc.dart';
 import '../../../../../../blocs/transaction/transaction_cubit.dart';
 import '../../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../../core/theme/theme.dart';
@@ -31,7 +31,10 @@ class CashPayment extends StatelessWidget {
       builder: (context, state) {
         final totalTagihan = state.finalTotal;
         final uangDiterima = state.receivedAmount;
-        final kembalian = state.changeAmount; // Pakai helper dari state
+        // final kembalian = state.changeAmount; // Pakai helper dari state
+        final kembalian = state.receivedAmount != null
+            ? (state.receivedAmount! - totalTagihan).clamp(0, double.infinity)
+            : 0;
         final isPaymentValid = state.isPaymentSufficient;
 
         return Scaffold(
@@ -123,7 +126,7 @@ class CashPayment extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           isPaymentValid
-                              ? _formatCurrency(kembalian)
+                              ? _formatCurrency(kembalian.toInt())
                               : 'Kurang ${_formatCurrency(totalTagihan - uangDiterima)}',
                           style: TextStyle(
                             fontSize: 20,
@@ -143,6 +146,8 @@ class CashPayment extends StatelessWidget {
                   isEnabled: uangDiterima != null && isPaymentValid,
                   onPressed: () async {
                     final cubit = context.read<TransactionCubit>();
+                    final stockBloc = context.read<StockBloc>();
+                    final productBloc = context.read<ProductBloc>();
                     final state = cubit.state;
 
                     // 🆕 VALIDASI STOK DULU
@@ -152,7 +157,7 @@ class CashPayment extends StatelessWidget {
                       final qty = state.getQuantity(product.id.toString());
                       final stock = product.productStock;
 
-                      if (qty > stock) {
+                      if (qty > stock!) {
                         hasStockIssue = true;
                         errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
                             'Tersedia: $stock, Dipilih: $qty';
@@ -161,18 +166,18 @@ class CashPayment extends StatelessWidget {
                     }
 
                     if (hasStockIssue) {
-                      FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                      FloatingMessage.show(context, message: errorMessage, backgroundColor: Colors.red);
                       return;
                     }
                     cubit.completeCashPayment();
-                    final stockBloc = context.read<StockBloc>();
-                    Navigator.push(
+                    Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
                         builder: (_) => MultiBlocProvider(
                           providers: [
                             BlocProvider.value(value: cubit),
                             BlocProvider.value(value: stockBloc),
+                            BlocProvider.value(value: productBloc),
                           ],
                           child: const TransactionSuccess(),
                         ),

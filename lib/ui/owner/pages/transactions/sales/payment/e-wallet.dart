@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import '../../../../../../blocs/history_stock/stock_bloc.dart';
+import '../../../../../../blocs/product/product_bloc.dart';
 import '../../../../../../blocs/transaction/transaction_cubit.dart';
 import '../../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../../core/theme/theme.dart';
@@ -136,7 +137,7 @@ class EwalletListWidget extends StatelessWidget {
     final stockBloc = context.read<StockBloc>();
 
     // Set payment method dengan detail e-wallet
-    cubit.setPaymentMethodWithDetail(PaymentMethod.ewallet, ewallet);
+    cubit.setPaymentMethod(ewallet);
 
     // Tampilkan dialog konfirmasi
     showDialog(
@@ -148,26 +149,33 @@ class EwalletListWidget extends StatelessWidget {
         child: EwalletConfirmationDialog(
           ewallet: ewallet,
           ewalletColor: _getEwalletColor(ewallet.name),
-          // icon: _getEwalletIcon(ewallet.provider),
+
           onConfirm: () {
             final cubit = context.read<TransactionCubit>();
-            // 1. SET UANG DITERIMA = totalte.finalTotal);
-            cubit.completeDigitalPayment(PaymentMethod.ewallet);
-            Navigator.of(dialogContext).pop();
+            final productBloc = context.read<ProductBloc>();
 
-            // Navigate ke TransactionSuccess
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MultiBlocProvider(
-                  providers: [
-                    BlocProvider.value(value: cubit),
-                    BlocProvider.value(value: stockBloc),
-                  ],
-                  child: const TransactionSuccess(),
+            cubit.setReceivedAmount(cubit.state.finalTotal);
+            cubit.completeDigitalPayment();
+
+            Navigator.of(dialogContext).pop(); // Tutup dialog dulu
+
+            // ✅ PERBAIKAN
+            if (context.mounted) {
+
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider.value(value: cubit),
+                      BlocProvider.value(value: stockBloc),
+                      BlocProvider.value(value: productBloc),
+                    ],
+                    child: const TransactionSuccess(),
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           onCancel: () {
             Navigator.of(dialogContext).pop(); // Tutup dialog

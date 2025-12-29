@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/ui/owner/pages/transactions/sales/payment/transaction_success.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import '../../../../../../blocs/history_stock/stock_bloc.dart';
+import '../../../../../../blocs/product/product_bloc.dart';
 import '../../../../../../blocs/transaction/transaction_cubit.dart';
 import '../../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../../core/theme/theme.dart';
@@ -124,7 +125,7 @@ class BankListWidget extends StatelessWidget {
     final stockBloc = context.read<StockBloc>();
 
     // Set payment method dengan detail bank
-    cubit.setPaymentMethodWithDetail(PaymentMethod.bankTransfer, bank);
+    cubit.setPaymentMethod(bank);
 
     // Tampilkan dialog konfirmasi
     showDialog(
@@ -138,23 +139,29 @@ class BankListWidget extends StatelessWidget {
           bankColor: _getBankColor(bank.name),
           onConfirm: () {
             final cubit = context.read<TransactionCubit>();
-            cubit.setReceivedAmount(cubit.state.finalTotal);
-            cubit.completeDigitalPayment(PaymentMethod.bankTransfer);
-            Navigator.of(dialogContext).pop(); // Tutup dialog
+            final productBloc = context.read<ProductBloc>();
 
-            // Navigate ke TransactionSuccess
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MultiBlocProvider(
-                  providers: [
-                    BlocProvider.value(value: cubit),
-                    BlocProvider.value(value: stockBloc),
-                  ],
-                  child: const TransactionSuccess(),
+            cubit.setReceivedAmount(cubit.state.finalTotal);
+            cubit.completeDigitalPayment();
+
+            Navigator.of(dialogContext).pop(); // Tutup dialog dulu
+
+            // ✅ PERBAIKAN: Pop halaman bank, baru push success
+            if (context.mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider.value(value: cubit),
+                      BlocProvider.value(value: stockBloc),
+                      BlocProvider.value(value: productBloc),
+                    ],
+                    child: const TransactionSuccess(),
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           },
           onCancel: () {
             Navigator.of(dialogContext).pop(); // Tutup dialog
