@@ -98,6 +98,13 @@ class _UpdateCashierPageState extends State<UpdateCashierPage> {
     return BlocListener<CashierBloc, CashierState>(
       listener: (context, state) {
         if (state is CashierLoaded) {
+          if (state.successMessage != null) {
+            FloatingMessage.show(
+              context,
+              message: state.successMessage!,
+              backgroundColor: primaryGreenColor,
+            );
+          }
           Navigator.of(context).pop(true);
         } else if (state is CashierError) {
           FloatingMessage.show(

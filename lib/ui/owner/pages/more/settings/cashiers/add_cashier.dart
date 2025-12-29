@@ -64,9 +64,15 @@ class _AddCashierPageState extends State<AddCashierPage> {
     return BlocListener<CashierBloc, CashierState>(
       listener: (context, state) {
         if (state is CashierLoaded) {
+          if (state.successMessage != null) {
+            FloatingMessage.show(
+              context,
+              message: state.successMessage!,
+              backgroundColor: primaryGreenColor,
+            );
+          }
           Navigator.of(context).pop(true);
-        }
-        else if (state is CashierError) {
+        } else if (state is CashierError) {
           FloatingMessage.show(
             context,
             message: state.message,
@@ -343,7 +349,7 @@ class CashierPassword extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF4CAF50),
+                color: primaryGreenColor,
                 width: 2,
               ),
             ),
@@ -433,7 +439,7 @@ class CashierPasswordConfirmation extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(
-                color: Color(0xFF4CAF50),
+                color: primaryGreenColor,
                 width: 2,
               ),
             ),

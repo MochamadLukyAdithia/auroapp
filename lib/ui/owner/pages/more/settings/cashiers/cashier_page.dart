@@ -122,10 +122,10 @@ class _CashierPageState extends State<CashierPage> {
   Widget build(BuildContext context) {
     return BlocConsumer<CashierBloc, CashierState>(
       listener: (context, state) {
-        if (state is CashierOperationSuccess) {
+        if (state is CashierLoaded && state.successMessage != null) {
           FloatingMessage.show(
             context,
-            message: state.message,
+            message: state.successMessage!,
             backgroundColor: primaryGreenColor,
           );
         } else if (state is CashierError) {
@@ -179,6 +179,9 @@ class _CashierPageState extends State<CashierPage> {
                   context,
                   MaterialPageRoute(builder: (_) => const AddCashierPage()),
                 );
+                if (context.mounted) {
+                  context.read<CashierBloc>().add(const FetchCashiers());
+                }
               },
               backgroundColor: primaryGreenColor,
               child: const Icon(Icons.add, color: Colors.white),
@@ -244,10 +247,13 @@ class EmptyCashierSection extends StatelessWidget {
                 ),
               ),
               onPressed: () async {
-                  await Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AddCashierPage()),
                 );
+                if (context.mounted) {
+                  context.read<CashierBloc>().add(const FetchCashiers());
+                }
               },
             ),
           ],
