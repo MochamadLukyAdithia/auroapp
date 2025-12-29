@@ -29,7 +29,7 @@ class CashierRepository {
             .toList();
 
         return ApiResponse.success(
-          message: meta['message'] ?? 'Cashiers retrieved successfully',
+          message: meta['message'] ?? 'Berhasil mengambil daftar kasir',
           data: {
             'cashiers': cashiers,
             'current_page': data['current_page'],
@@ -42,24 +42,24 @@ class CashierRepository {
       }
 
       return ApiResponse.error(
-        message: response.data['meta']?['message'] ?? 'Failed to fetch cashiers',
+        message: response.data['meta']?['message'] ?? 'Gagal mengambil daftar kasir',
         code: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       if (e.response != null) {
         final meta = e.response?.data['meta'];
         return ApiResponse.error(
-          message: meta?['message'] ?? 'Failed to fetch cashiers',
+          message: meta?['message'] ?? 'Gagal mengambil daftar kasir',
           code: e.response?.statusCode ?? 500,
         );
       }
       return ApiResponse.error(
-        message: 'Network error: ${e.message}',
+        message: 'Kesalahan jaringan: ${e.message}',
         code: 500,
       );
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Kesalahan tak terduga: ${e.toString()}',
         code: 500,
       );
     }
@@ -82,14 +82,14 @@ class CashierRepository {
       if (response.statusCode == 201 || response.statusCode == 200) {
         final meta = response.data['meta'];
         return ApiResponse.success(
-          message: meta['message'] ?? 'Cashier created successfully',
+          message: meta['message'] ?? 'Kasir berhasil dibuat',
           data: null,
           code: response.statusCode!,
         );
       }
 
       return ApiResponse.error(
-        message: response.data['meta']?['message'] ?? 'Failed to create cashier',
+        message: response.data['meta']?['message'] ?? 'Gagal membuat kasir',
         code: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
@@ -98,7 +98,7 @@ class CashierRepository {
 
         if (e.response?.statusCode == 422) {
           final errors = e.response?.data['data'];
-          String errorMessage = 'Validation failed';
+          String errorMessage = 'Validasi gagal';
 
           if (errors != null && errors is Map) {
             errorMessage = errors.values.first is List
@@ -113,17 +113,17 @@ class CashierRepository {
         }
 
         return ApiResponse.error(
-          message: meta?['message'] ?? 'Failed to create cashier',
+          message: meta?['message'] ?? 'Gagal membuat kasir',
           code: e.response?.statusCode ?? 500,
         );
       }
       return ApiResponse.error(
-        message: 'Network error: ${e.message}',
+        message: 'Kesalahan jaringan: ${e.message}',
         code: 500,
       );
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Kesalahan tak terduga: ${e.toString()}',
         code: 500,
       );
     }
@@ -147,14 +147,14 @@ class CashierRepository {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final meta = response.data['meta'];
         return ApiResponse.success(
-          message: meta['message'] ?? 'Cashier updated successfully',
+          message: meta['message'] ?? 'Kasir berhasil diperbarui',
           data: null,
           code: response.statusCode!,
         );
       }
 
       return ApiResponse.error(
-        message: response.data['meta']?['message'] ?? 'Failed to update cashier',
+        message: response.data['meta']?['message'] ?? 'Gagal memperbarui kasir',
         code: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
@@ -163,7 +163,7 @@ class CashierRepository {
 
         if (e.response?.statusCode == 422) {
           final errors = e.response?.data['data'];
-          String errorMessage = 'Validation failed';
+          String errorMessage = 'Validasi gagal';
 
           if (errors != null && errors is Map) {
             errorMessage = errors.values.first is List
@@ -179,23 +179,23 @@ class CashierRepository {
 
         if (e.response?.statusCode == 404) {
           return ApiResponse.error(
-            message: 'Cashier not found',
+            message: 'Kasir tidak ditemukan',
             code: 404,
           );
         }
 
         return ApiResponse.error(
-          message: meta?['message'] ?? 'Failed to update cashier',
+          message: meta?['message'] ?? 'Gagal memperbarui kasir',
           code: e.response?.statusCode ?? 500,
         );
       }
       return ApiResponse.error(
-        message: 'Network error: ${e.message}',
+        message: 'Kesalahan jaringan: ${e.message}',
         code: 500,
       );
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Kesalahan tak terduga: ${e.toString()}',
         code: 500,
       );
     }
@@ -208,13 +208,13 @@ class CashierRepository {
       if (response.statusCode == 200 || response.statusCode == 202) {
         final meta = response.data['meta'];
         return ApiResponse.success(
-          message: meta['message'] ?? 'Cashier deleted successfully',
+          message: meta['message'] ?? 'Kasir berhasil dihapus',
           code: response.statusCode!,
         );
       }
 
       return ApiResponse.error(
-        message: response.data['meta']?['message'] ?? 'Failed to delete cashier',
+        message: response.data['meta']?['message'] ?? 'Gagal menghapus kasir',
         code: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
@@ -223,23 +223,23 @@ class CashierRepository {
 
         if (e.response?.statusCode == 404) {
           return ApiResponse.error(
-            message: 'Cashier not found',
+            message: 'Kasir tidak ditemukan',
             code: 404,
           );
         }
 
         return ApiResponse.error(
-          message: meta?['message'] ?? 'Failed to delete cashier',
+          message: meta?['message'] ?? 'Gagal menghapus kasir',
           code: e.response?.statusCode ?? 500,
         );
       }
       return ApiResponse.error(
-        message: 'Network error: ${e.message}',
+        message: 'Kesalahan jaringan: ${e.message}',
         code: 500,
       );
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Kesalahan tak terduga: ${e.toString()}',
         code: 500,
       );
     }
