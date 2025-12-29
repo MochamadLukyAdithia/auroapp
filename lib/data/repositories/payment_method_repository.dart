@@ -59,15 +59,10 @@ class PaymentMethodRepository {
         'status_payment_methods': isEnabled ? '1' : '0', // ✅ String, bukan integer!
       };
 
-      print('📤 PUT /payment-methods/$paymentMethodId/update');
-      print('📦 Payload: $payload');
-
       final response = await _dio.put(
         '/payment-methods/$paymentMethodId/update',
         data: payload,
       );
-
-      print('📥 Response: ${response.data}');
 
       if (response.data['meta']['status'] == true) {
         return ApiResponse(
@@ -81,13 +76,11 @@ class PaymentMethodRepository {
         );
       }
     } on DioException catch (e) {
-      print('❌ PUT Error: ${e.response?.data}');
       return ApiResponse(
         success: false,
         message: e.response?.data['meta']['message'] ?? 'Network error',
       );
     } catch (e) {
-      print('❌ Unexpected Error: $e');
       return ApiResponse(
         success: false,
         message: 'Unexpected error: ${e.toString()}',
