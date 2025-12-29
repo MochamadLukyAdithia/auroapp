@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../../../blocs/history_stock/stock_bloc.dart';
-import '../../../../../../blocs/history_stock/stock_event.dart';
+import '../../../../../../blocs/company/company_cubit.dart';
 import '../../../../../../blocs/transaction/transaction_cubit.dart';
 import '../../../../../../blocs/transaction/transaction_state.dart';
 import '../../../../../../core/theme/theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../../../../../core/utils/receipt_service.dart';
+import '../../../../../../data/models/company_model.dart';
+import '../../../../../../route/route.dart';
 import '../../../../../widgets/floating_message.dart';
 
 class TransactionSuccess extends StatefulWidget {
@@ -31,22 +30,23 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
   Future<void> _processTransaction() async {
     try {
       final transactionCubit = context.read<TransactionCubit>();
-      final stockBloc = context.read<StockBloc>();
 
-      // 🔹 Kurangi stok dulu
-      final stockReductions = transactionCubit.getStockReductionData();
-      for (var item in stockReductions) {
-        stockBloc.add(AddStockOut(
-          productId: item['productId'],
-          quantity: item['quantity'],
-          notes: 'Transaksi: ${item['transactionId']}',
-        ));
+      // Panggil API untuk save transaction
+      await transactionCubit.completeAndSaveTransaction();
+
+      // Check if success
+      final state = transactionCubit.state;
+      if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+        setState(() {
+          _isProcessing = false;
+          _hasError = true;
+          _errorMessage = state.errorMessage!;
+        });
+      } else {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+        }
       }
-
-      await Future.delayed(const Duration(milliseconds: 500));
-      await transactionCubit.saveTransaction();
-
-      setState(() => _isProcessing = false);
     } catch (e) {
       setState(() {
         _isProcessing = false;
@@ -56,7 +56,7 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
     }
   }
 
-  String _formatCurrency(int value) {
+  String _formatCurrency(double value) {
     return NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0)
         .format(value);
   }
@@ -68,7 +68,7 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // Hanya bisa pop kalau TIDAK sedang processing
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (_isProcessing && !didPop) {
           FloatingMessage.show(
@@ -80,23 +80,18 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
           return;
         }
 
-        if (!didPop && !_isProcessing && !_hasError) {
-          final shouldPop = await ConfirmationDialog.show(
-            context,
-            title: 'Keluar dari Halaman Ini?',
-            message: 'Pastikan Anda sudah mencatat atau mencetak struk transaksi ini',
-            confirmText: 'Ya, Keluar',
-            cancelText: 'Batal',
-            icon: Icons.warning_amber_rounded,
-            iconColor: Colors.orange,
-            confirmColor: primaryGreenColor,
-          );
-
-          if (shouldPop == true && context.mounted) {
-            context.read<TransactionCubit>().resetTransaction();
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          }
-        }
+        // if (!didPop && !_isProcessing && !_hasError) {
+        //   final shouldPop = await ConfirmationDialog.show(
+        //     context,
+        //     title: 'Keluar dari Halaman Ini?',
+        //     message: 'Pastikan Anda sudah mencatat atau mencetak struk transaksi ini',
+        //     confirmText: 'Ya, Keluar',
+        //     cancelText: 'Batal',
+        //     icon: Icons.warning_amber_rounded,
+        //     iconColor: Colors.orange,
+        //     confirmColor: primaryGreenColor,
+        //   );
+        // }
       },
       child: _buildContent(context),
     );
@@ -119,7 +114,6 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
       );
     }
 
-    // 🔹 Jika ada error saat proses
     if (_hasError) {
       return Scaffold(
         backgroundColor: Colors.white,
@@ -127,7 +121,7 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
               const Text(
                 'Transaksi Gagal',
@@ -153,8 +147,16 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                    context.read<TransactionCubit>().resetTransaction();
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.transaction,
+                          (route) => route.isFirst,
+                    );
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryGreenColor,
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Kembali'),
               ),
             ],
@@ -163,30 +165,40 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
       );
     }
 
-    // 🔹 Kalau sudah berhasil (normal state)
     return BlocBuilder<TransactionCubit, TransactionState>(
       builder: (context, state) {
-        final totalTagihan = state.totalPayment;
-        final diterima = state.receivedAmount ?? 0;
-        final diskon = state.discount;
-        final biayaLain = state.otherCosts;
-        final kembalian = state.changeAmount;
-        final transactionDate = state.transactionDate ?? DateTime.now();
-        final customer = state.selectedCustomer;
+        final transaction = state.completedTransaction;
+
+        // Gunakan data dari completed transaction (dari API)
+        final transactionNumber = transaction?.transactionNumber ?? '';
+        final totalTagihan = transaction?.totalTransaction ?? state.finalTotal.toDouble();
+        final diterima = transaction?.totalPayment ?? (state.receivedAmount ?? 0).toDouble();
+        final diskon = transaction?.transactionDiscount ?? state.discount.toDouble();
+        final biayaLain = transaction?.otherCost ?? state.otherCosts.toDouble();
+        final kembalian = transaction?.changeAmount ?? state.changeAmount.toDouble();
+        final transactionDate = transaction?.transactionDate ?? state.transactionDate ?? DateTime.now();
+        final customer = transaction?.customer ?? state.selectedCustomer;
+        final paymentMethod = transaction?.companyPaymentMethod.paymentMethod.paymentMethodName ??
+            state.selectedPaymentMethod?.name ?? // ✅
+            'Belum dipilih';
 
         return Scaffold(
           backgroundColor: Colors.grey.shade50,
           body: SafeArea(
             child: Column(
               children: [
-                // Content
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
                         const SizedBox(height: 40),
-
+                        const Icon(
+                          Icons.check_circle,
+                          size: 80,
+                          color: primaryGreenColor,
+                        ),
+                        const SizedBox(height: 16),
                         const Text(
                           'Transaksi Berhasil',
                           style: TextStyle(
@@ -197,7 +209,6 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                           ),
                         ),
                         const SizedBox(height: 8),
-
                         Text(
                           _formatDateTime(transactionDate),
                           style: TextStyle(
@@ -206,7 +217,26 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                             color: Colors.grey.shade600,
                           ),
                         ),
-
+                        if (transactionNumber.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              transactionNumber,
+                              style: TextStyle(
+                                fontFamily: fontType,
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (customer != null) ...[
                           const SizedBox(height: 8),
                           Container(
@@ -238,10 +268,7 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                             ),
                           ),
                         ],
-
                         const SizedBox(height: 32),
-
-                        // Detail Transaksi Card
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(20),
@@ -268,13 +295,11 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-
                               _DetailRow(
                                 label: 'Total Tagihan',
                                 value: _formatCurrency(totalTagihan),
                               ),
                               const SizedBox(height: 12),
-
                               if (diskon > 0) ...[
                                 _DetailRow(
                                   label: 'Diskon',
@@ -284,21 +309,24 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                                 ),
                                 const SizedBox(height: 12),
                               ],
-
                               if (biayaLain > 0) ...[
                                 _DetailRow(
-                                  label: 'Biaya Lain',
+                                  label: transaction?.nameOtherCost ?? 'Biaya Lain',
                                   value: _formatCurrency(biayaLain),
                                 ),
                                 const SizedBox(height: 12),
                               ],
-
+                              _DetailRow(
+                                label: 'Metode Pembayaran',
+                                value: paymentMethod,
+                                valueIsBold: true,
+                              ),
+                              const SizedBox(height: 12),
                               _DetailRow(
                                 label: 'Diterima',
                                 value: _formatCurrency(diterima),
                               ),
                               const SizedBox(height: 12),
-
                               _DetailRow(
                                 label: 'Kembalian',
                                 value: _formatCurrency(kembalian),
@@ -307,12 +335,74 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                             ],
                           ),
                         ),
+
+                        // Detail Items (opsional, bisa ditampilkan jika perlu)
+                        if (transaction != null && transaction.detailTransaction.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.shade200,
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Item Produk',
+                                  style: TextStyle(
+                                    fontFamily: fontType,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                ...transaction.detailTransaction.map((detail) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${detail.product.productName} x${detail.quantity}',
+                                            style: TextStyle(
+                                              fontFamily: fontType,
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatCurrency(detail.subtotal),
+                                          style: const TextStyle(
+                                            fontFamily: fontType,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
                 ),
-
-                // Bottom Buttons
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -327,43 +417,79 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                   ),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                                side: const BorderSide(
-                                    color: primaryGreenColor),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () async {
-                                final stockBloc = context.read<StockBloc>();
-                                final transactionCubit =
-                                context.read<TransactionCubit>();
+                      // Tombol Lihat Detail Struk
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(color: primaryGreenColor, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            if (transaction != null) {
+                              // Ambil data company dari CompanyCubit
+                              final companyCubit = context.read<CompanyCubit>();
+                              final companyState = companyCubit.state;
 
-                                final stockReductions =
-                                transactionCubit.getStockReductionData();
-                                for (var item in stockReductions) {
-                                  stockBloc.add(AddStockOut(
-                                    productId: item['productId'],
-                                    quantity: item['quantity'],
-                                    notes:
-                                    'Transaksi: ${item['transactionId']}',
-                                  ));
+                              Company? company;
+
+                              if (companyState is CompanyLoaded) {
+                                company = companyState.company;
+                              } else {
+                                // Jika belum loaded, load dulu
+                                await companyCubit.loadCompany();
+                                final newState = companyCubit.state;
+                                if (newState is CompanyLoaded) {
+                                  company = newState.company;
                                 }
+                              }
 
-                                await Future.delayed(
-                                    const Duration(milliseconds: 300));
+                              if (company == null) {
+                                if (context.mounted) {
+                                  FloatingMessage.show(
+                                    context,
+                                    message: 'Data toko tidak tersedia',
+                                    backgroundColor: Colors.red,
+                                  );
+                                }
+                                return;
+                              }
 
-                                await transactionCubit.saveTransaction();
-                                transactionCubit.resetTransaction();
-                              },
-                              child: const Text(
-                                'Cetak Struk',
+                              // Arahkan ke halaman detail struk
+                              if (context.mounted) {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.transactionReceipt,
+                                  arguments: {
+                                    'transaction': transaction,
+                                    'company': company,
+                                  },
+                                );
+                              }
+                            } else {
+                              if (context.mounted) {
+                                FloatingMessage.show(
+                                  context,
+                                  message: 'Data transaksi tidak tersedia',
+                                  backgroundColor: Colors.red,
+                                );
+                              }
+                            }
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.receipt_long,
+                                color: primaryGreenColor,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Lihat Detail Struk',
                                 style: TextStyle(
                                   fontFamily: fontType,
                                   fontSize: 15,
@@ -371,63 +497,13 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                                   color: primaryGreenColor,
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                                side: const BorderSide(
-                                    color: primaryGreenColor),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: () async {
-                                try {
-                                  // final transaction = context.read<TransactionCubit>().getCurrentTransaction();
-                                  // await ReceiptService.shareReceipt(transaction);
-
-                                  if (context.mounted) {
-                                    // ScaffoldMessenger.of(context).showSnackBar(
-                                    //   const SnackBar(
-                                    //     content:
-                                    //     Text('Struk berhasil dibagikan'),
-                                    //     backgroundColor: primaryGreenColor,
-                                    //   ),
-                                    // );
-                                    FloatingMessage.show(context, message: 'Struk Berhasil Dibagikan', textOnly : true, backgroundColor: primaryBlueColor);
-
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    // ScaffoldMessenger.of(context).showSnackBar(
-                                    //   SnackBar(
-                                    //     content: Text(
-                                    //         'Gagal membagikan struk: $e'),
-                                    //     backgroundColor: Colors.red,
-                                    //   ),
-                                    // );
-                                    FloatingMessage.show(context, message: 'Gagal Membagikan Struk', textOnly : true, backgroundColor: primaryBlueColor);
-                                  }
-                                }
-                              },
-                              child: const Text(
-                                'Bagikan Struk',
-                                style: TextStyle(
-                                  fontFamily: fontType,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryGreenColor,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Tombol Transaksi Baru
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -436,28 +512,37 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
                             backgroundColor: primaryGreenColor,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             elevation: 0,
                           ),
-                          onPressed: () async {
+                          onPressed: () {
                             context.read<TransactionCubit>().resetTransaction();
-                            Navigator.of(context)
-                                .popUntil((route) => route.isFirst);
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              AppRoutes.transaction,
+                                  (route) => route.isFirst,
+                            );
                           },
-                          child: const Text(
-                            'Transaksi Baru',
-                            style: TextStyle(
-                              fontFamily: fontType,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.add_circle_outline, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Transaksi Baru',
+                                style: TextStyle(
+                                  fontFamily: fontType,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
+                )
               ],
             ),
           ),
@@ -467,11 +552,11 @@ class _TransactionSuccessState extends State<TransactionSuccess> {
   }
 }
 
-// Widget untuk row detail transaksi
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
   final bool isHighlight;
+  final bool valueIsBold;
   final Color? labelColor;
   final Color? valueColor;
 
@@ -479,6 +564,7 @@ class _DetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.isHighlight = false,
+    this.valueIsBold = false,
     this.labelColor,
     this.valueColor,
   });
@@ -503,7 +589,7 @@ class _DetailRow extends StatelessWidget {
           style: TextStyle(
             fontFamily: fontType,
             fontSize: isHighlight ? 16 : 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: (isHighlight || valueIsBold) ? FontWeight.w600 : FontWeight.normal,
             color: valueColor ??
                 (isHighlight ? primaryGreenColor : Colors.black87),
           ),
@@ -512,7 +598,6 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
 
 class ConfirmationDialog extends StatelessWidget {
   final String title;
@@ -583,7 +668,6 @@ class ConfirmationDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon
             if (icon != null)
               Container(
                 width: 64,
@@ -598,10 +682,7 @@ class ConfirmationDialog extends StatelessWidget {
                   color: iconColor ?? primaryGreenColor,
                 ),
               ),
-
             if (icon != null) const SizedBox(height: 20),
-
-            // Title
             Text(
               title,
               textAlign: TextAlign.center,
@@ -612,10 +693,7 @@ class ConfirmationDialog extends StatelessWidget {
                 color: Colors.black87,
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Message
             Text(
               message,
               textAlign: TextAlign.center,
@@ -626,10 +704,7 @@ class ConfirmationDialog extends StatelessWidget {
                 height: 1.5,
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Buttons
             Row(
               children: [
                 Expanded(
