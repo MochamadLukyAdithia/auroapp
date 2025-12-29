@@ -12,6 +12,7 @@ class ProductRepository {
   Future<ProductResponse> getProducts({
     int? limit,
     int page = 1,
+    String? search,
   }) async {
     try {
       final queryParams = <String, dynamic>{
@@ -22,16 +23,28 @@ class ProductRepository {
         queryParams['limit'] = limit;
       }
 
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
       final response = await _dio.get(
-        '/products',
-        queryParameters: {
-          'limit': limit,
-          'page': page,
-        },
+        '/products/active-only',
+        queryParameters: queryParams,
       );
 
       return ProductResponse.fromJson(response.data);
     } catch (e) {
+      if (e is DioException) {
+        return ProductResponse(
+          meta: Meta(
+            code: e.response?.statusCode ?? 500,
+            status: false,
+            message: e.response?.data['meta']?['message'] ??
+                'Produk tidak ditemukan atau belum diaktifkan',
+          ),
+        );
+      }
+
       return ProductResponse(
         meta: Meta(
           code: 500,
@@ -43,6 +56,8 @@ class ProductRepository {
   }
 
   // POST
+  // lib/data/repositories/product_repository.dart
+
   Future<ApiResponse<ProductModel>> createProduct(
       Map<String, dynamic> data,
       File? photoFile,
@@ -83,13 +98,40 @@ class ProductRepository {
       }
     } on DioException catch (e) {
       String errorMessage = 'Gagal menambahkan produk';
-      if (e.response?.data != null) {
-        if (e.response!.data is Map) {
-          errorMessage = e.response!.data['message'] ??
-              e.response!.data['meta']?['message'] ??
-              errorMessage;
+
+      if (e.response?.statusCode == 422 || e.response?.statusCode == 400) {
+        if (e.response?.data != null) {
+          final responseData = e.response!.data;
+
+          if (responseData['meta'] != null) {
+            errorMessage = responseData['meta']['message'] ?? errorMessage;
+
+            if (responseData['data'] != null) {
+              final errors = responseData['data'];
+              if (errors is Map) {
+                List<String> errorList = [];
+                errors.forEach((key, value) {
+                  if (value is List) {
+                    errorList.addAll(value.cast<String>());
+                  }
+                });
+                if (errorList.isNotEmpty) {
+                  errorMessage = errorList.join('\n');
+                }
+              }
+            }
+          }
+        }
+      } else {
+        if (e.response?.data != null) {
+          if (e.response!.data is Map) {
+            errorMessage = e.response!.data['message'] ??
+                e.response!.data['meta']?['message'] ??
+                errorMessage;
+          }
         }
       }
+
       return ApiResponse(
         success: false,
         message: errorMessage,
@@ -101,7 +143,6 @@ class ProductRepository {
       );
     }
   }
-
 
   Future<ApiResponse<ProductModel>> getProduct(int id) async {
     try {
