@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../../core/theme/theme.dart';
 import '../../../../../data/models/finance_model.dart';
+import '../../data/models/company_model.dart';
 import 'custom_app_bar.dart';
 
 class FinanceReceiptPage extends StatelessWidget {
   final Finance finance;
+  final Company company;
 
   const FinanceReceiptPage({
     Key? key,
     required this.finance,
+    required this.company,
   }) : super(key: key);
 
-  String _formatCurrency(int amount) {
+  String _formatCurrency(num amount) {
     return NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0)
         .format(amount);
   }
@@ -47,17 +50,17 @@ class FinanceReceiptPage extends StatelessWidget {
               child: Column(
                 children: [
                   // HEADER TOKO
-                  const Text(
-                    'Cafe Indonesia',
-                    style: TextStyle(
+                  Text(
+                    company.name,
+                    style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const Text(
-                    'Jl. Kalimantan',
-                    style: TextStyle(
+                  Text(
+                    company.address,
+                    style: const TextStyle(
                       fontFamily: fontType,
                       fontSize: 12,
                       color: Colors.grey,
@@ -121,61 +124,41 @@ class FinanceReceiptPage extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // JUMLAH (Highlighted)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Jumlah',
-                          style: TextStyle(
-                            fontFamily: fontType,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          _formatCurrency(finance.amount as int),
-                          style: TextStyle(
-                            fontFamily: fontType,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ),
+                  _ReceiptRow(
+                    label: 'Jumlah',
+                    value: _formatCurrency(finance.amount),
+                    isBold: true,
                   ),
 
                   // CATATAN (jika ada)
                   if (finance.description != null && finance.description!.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     const Divider(height: 24),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Catatan',
-                          style: TextStyle(
-                            fontFamily: fontType,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey,
+                    Align(
+                      alignment: Alignment.centerLeft, // ✅ Tambahkan ini
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Catatan',
+                            style: TextStyle(
+                              fontFamily: fontType,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          finance.description!,
-                          style: const TextStyle(
-                            fontFamily: fontType,
-                            fontSize: 13,
+                          const SizedBox(height: 6),
+                          Text(
+                            finance.description!,
+                            style: const TextStyle(
+                              fontFamily: fontType,
+                              fontSize: 13,
+                            ),
+                            textAlign: TextAlign.left, // ✅ Tambahkan ini juga
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
 
