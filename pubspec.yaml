@@ -54,6 +54,9 @@ dependencies:
   file_picker: ^10.3.6
   image_picker: ^1.2.1
   dio: ^5.9.0
+  shimmer_animation: ^2.2.2+1
+  screenshot: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -84,3 +87,9 @@ flutter:
     - assets/icon/auropay_logo.png
     - assets/icon/ellipse.png
 
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/auropay_logo.png"
+  min_sdk_android: 21
