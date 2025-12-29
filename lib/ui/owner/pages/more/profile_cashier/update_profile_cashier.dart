@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_mobile/core/theme/theme.dart';
 import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
+import 'package:pos_mobile/ui/widgets/floating_message.dart';
 import '../../../../../../blocs/cashier/cashier_bloc.dart';
 import '../../../../../../blocs/cashier/cashier_event.dart';
 import '../../../../../../blocs/cashier/cashier_state.dart';
@@ -19,23 +20,21 @@ class UpdateProfileCashier extends StatefulWidget {
 class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmationController = TextEditingController();
 
-
   bool _isPasswordVisible = false;
+
+  bool get isUpdate => widget.cashier != null;
 
   @override
   void initState() {
     super.initState();
 
-    // Load data dari cashier yang ada
     if (widget.cashier != null) {
       _nameController.text = widget.cashier!.fullName;
-      _emailController.text = widget.cashier!.email;
       _phoneController.text = widget.cashier!.phoneNumber;
       _addressController.text = widget.cashier!.userAddress ?? '';
     }
@@ -44,7 +43,6 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
     _passwordController.dispose();
@@ -57,7 +55,7 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
       final cashier = Cashier(
         id: widget.cashier?.id,
         fullName: _nameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: widget.cashier?.email ?? '',
         password: '',
         passwordConfirmation: '',
         phoneNumber: _phoneController.text.trim(),
@@ -68,15 +66,19 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
         updatedAt: DateTime.now(),
       );
 
-      if (widget.cashier == null) {
+      // ADD
+      if (!isUpdate) {
         context.read<CashierBloc>().add(
           AddCashier(
             cashier: cashier,
             password: _passwordController.text,
-            passwordConfirmation: _passwordConfirmationController.text, // 🆕
+            passwordConfirmation: _passwordConfirmationController.text,
           ),
         );
-      } else {
+      }
+
+      // UPDATE
+      else {
         context.read<CashierBloc>().add(
           UpdateCashier(
             cashier: cashier,
@@ -85,7 +87,7 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
                 : _passwordController.text,
             passwordConfirmation: _passwordConfirmationController.text.isEmpty
                 ? null
-                : _passwordConfirmationController.text, // 🆕
+                : _passwordConfirmationController.text,
           ),
         );
       }
@@ -94,8 +96,6 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
 
   @override
   Widget build(BuildContext context) {
-    final isUpdate = widget.cashier != null;
-
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: CustomAppBar(
@@ -103,26 +103,18 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
       ),
       body: BlocListener<CashierBloc, CashierState>(
         listener: (context, state) {
-          if (state is CashierOperationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  isUpdate
-                      ? 'Profil kasir berhasil diperbarui'
-                      : 'Kasir berhasil ditambahkan',
-                ),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
+          if (state is CashierLoaded && state.successMessage != null) {
+            FloatingMessage.show(
+              context,
+              message: state.successMessage!,
+              backgroundColor: primaryGreenColor,
             );
             Navigator.pop(context);
           } else if (state is CashierError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
+            FloatingMessage.show(
+              context,
+              message: state.message,
+              backgroundColor: Colors.red,
             );
           }
         },
@@ -140,7 +132,7 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
                         controller: _nameController,
                         label: 'Nama Lengkap',
                         icon: Icons.person_rounded,
-                        hint: 'Masukkan nama lengkasir',
+                        hint: 'Masukkan nama lengkap',
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Nama lengkap tidak boleh kosong';
@@ -149,28 +141,15 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _InputField(
-                        controller: _emailController,
-                        label: 'Email',
-                        icon: Icons.email_rounded,
-                        hint: 'Masukkan email',
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Email tidak boleh kosong';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Email tidak valid';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
+
+                      /// PASSWORD
                       _InputField(
                         controller: _passwordController,
                         label: 'Password',
                         icon: Icons.lock_rounded,
-                        hint: 'Masukkan password',
+                        hint: isUpdate
+                            ? 'Kosongkan jika tidak ingin ubah password'
+                            : 'Masukkan password',
                         obscureText: !_isPasswordVisible,
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -179,53 +158,68 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
                                 : Icons.visibility_off_rounded,
                             color: Colors.grey[600],
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
+                          onPressed: () =>
+                              setState(() => _isPasswordVisible = !_isPasswordVisible),
                         ),
+
+                        /// VALIDATOR PASSWORD OPTIONAL SAAT UPDATE
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Password tidak boleh kosong';
+                          if (!isUpdate) {
+                            if (value == null || value.isEmpty) {
+                              return 'Password tidak boleh kosong';
+                            }
+                            if (value.length < 8) {
+                              return 'Password minimal 8 karakter';
+                            }
                           }
-                          if (value.length < 6) {
-                            return 'Password minimal 6 karakter';
+
+                          if (isUpdate && value!.isNotEmpty && value.length < 8) {
+                            return 'Password minimal 8 karakter';
                           }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16), // 🆕 TAMBAH DARI SINI
-                      _InputField(
-                        controller: _passwordConfirmationController,
-                        label: 'Konfirmasi Password',
-                        icon: Icons.lock_outline_rounded,
-                        hint: 'Ulangi password',
-                        obscureText: !_isPasswordVisible,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: Colors.grey[600],
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Konfirmasi password tidak boleh kosong';
-                          }
-                          if (value != _passwordController.text) {
-                            return 'Konfirmasi password tidak sesuai';
-                          }
+
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
+
+                      /// KONFIRMASI
+                      _InputField(
+                        controller: _passwordConfirmationController,
+                        label: 'Konfirmasi Password',
+                        icon: Icons.lock_outline_rounded,
+                        hint: isUpdate
+                            ? 'Kosongkan jika tidak ubah password'
+                            : 'Ulangi password',
+                        obscureText: !_isPasswordVisible,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isPasswordVisible
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                            color: Colors.grey[600],
+                          ),
+                          onPressed: () =>
+                              setState(() => _isPasswordVisible = !_isPasswordVisible),
+                        ),
+
+                        /// VALIDATOR (OPTIONAL SAAT UPDATE)
+                        validator: (value) {
+                          if (!isUpdate) {
+                            if (value == null || value.isEmpty) {
+                              return 'Konfirmasi password tidak boleh kosong';
+                            }
+                          }
+
+                          if (value != _passwordController.text &&
+                              value!.isNotEmpty) {
+                            return 'Konfirmasi password tidak sesuai';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
                       _InputField(
                         controller: _phoneController,
                         label: 'Nomor Telepon',
@@ -240,6 +234,7 @@ class _UpdateProfileCashierState extends State<UpdateProfileCashier> {
                         },
                       ),
                       const SizedBox(height: 16),
+
                       _InputField(
                         controller: _addressController,
                         label: 'Alamat',
@@ -309,7 +304,7 @@ class _InputField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey[400]),
-            prefixIcon: Icon(icon, color: primaryBlueColor),
+            prefixIcon: Icon(icon, color: primaryGreenColor),
             suffixIcon: suffixIcon,
             filled: true,
             fillColor: Colors.white,
@@ -323,7 +318,7 @@ class _InputField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: primaryBlueColor, width: 2),
+              borderSide: BorderSide(color: primaryGreenColor, width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -377,15 +372,15 @@ class _SaveButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 gradient: LinearGradient(
                   colors: [
-                    primaryBlueColor,
-                    primaryBlueColor.withOpacity(0.8)
+                    primaryGreenColor,
+                    primaryGreenColor.withOpacity(0.8)
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryBlueColor.withOpacity(0.3),
+                    color: primaryGreenColor.withOpacity(0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
@@ -419,7 +414,9 @@ class _SaveButton extends StatelessWidget {
                           color: Colors.white, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        isUpdate ? 'Simpan Perubahan' : 'Tambah Kasir',
+                        isUpdate
+                            ? 'Simpan Perubahan'
+                            : 'Tambah Kasir',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

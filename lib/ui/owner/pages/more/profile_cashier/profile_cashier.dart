@@ -212,7 +212,7 @@ class _ProfileCashierState extends State<ProfileCashier> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: primaryBlueColor.withOpacity(0.1),
+                    color: primaryGreenColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -221,7 +221,7 @@ class _ProfileCashierState extends State<ProfileCashier> {
                       Icon(
                         Icons.person_outline_rounded,
                         size: 16,
-                        color: primaryBlueColor,
+                        color: primaryGreenColor,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -229,7 +229,7 @@ class _ProfileCashierState extends State<ProfileCashier> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: primaryBlueColor,
+                          color: primaryGreenColor,
                         ),
                       ),
                     ],
@@ -270,11 +270,11 @@ class CashierAvatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: Container(
-          color: primaryBlueColor.withOpacity(0.1),
+          color: primaryGreenColor.withOpacity(0.1),
           child: Icon(
             Icons.person_rounded,
             size: 60,
-            color: primaryBlueColor,
+            color: primaryGreenColor,
           ),
         ),
       ),
@@ -366,12 +366,12 @@ class CashierInfoItem extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: primaryBlueColor.withOpacity(0.1),
+            color: primaryGreenColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icon,
-            color: primaryBlueColor,
+            color: primaryGreenColor,
             size: 24,
           ),
         ),
@@ -430,13 +430,13 @@ class EditCashierButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
-              colors: [primaryBlueColor, primaryBlueColor.withOpacity(0.8)],
+              colors: [primaryGreenColor, primaryGreenColor.withOpacity(0.8)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: primaryBlueColor.withOpacity(0.3),
+                color: primaryGreenColor.withOpacity(0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
