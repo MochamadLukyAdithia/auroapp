@@ -205,19 +205,20 @@ class _VerificationPageState extends State<VerificationPage> {
                     const SizedBox(height: 40),
 
                     // OTP Input Boxes
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        6,
-                            (index) => Padding(
-                          padding: EdgeInsets.only(
-                            left: index == 0 ? 0 : 8,
-                            right: index == 5 ? 0 : 8,
-                          ),
-                          child: _OTPBox(
-                            controller: _controllers[index],
-                            focusNode: _focusNodes[index],
-                            onChanged: (value) {
+                  SizedBox(
+                      width: double.infinity,
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly, // ✅ Ubah ke spaceEvenly
+                          children: List.generate(
+                              6,
+                                  (index) => Flexible( // ✅ Tambah Flexible
+                                  child: Container(
+                                      constraints: const BoxConstraints(maxWidth: 50), // ✅ Batasi width
+                                      margin: const EdgeInsets.symmetric(horizontal: 4), // ✅ Ganti padding dengan margin
+                                      child: _OTPBox(
+                                          controller: _controllers[index],
+                                          focusNode: _focusNodes[index],
+                              onChanged: (value) {
                               if (value.isNotEmpty && index < 5) {
                                 _focusNodes[index + 1].requestFocus();
                               }
@@ -226,7 +227,6 @@ class _VerificationPageState extends State<VerificationPage> {
                               }
 
                               final otp = _controllers.map((c) => c.text).join();
-                              print('🔢 Current OTP: "$otp" (length: ${otp.length})');
                               context.read<VerificationBloc>().add(
                                 VerificationOtpChanged(otp),
                               );
@@ -235,6 +235,8 @@ class _VerificationPageState extends State<VerificationPage> {
                         ),
                       ),
                     ),
+                      ),
+                  ),
 
                     const SizedBox(height: 40),
 
@@ -258,8 +260,6 @@ class _VerificationPageState extends State<VerificationPage> {
                             onPressed: isLoading
                                 ? null
                                 : () {
-                              print('🔘 Button clicked!');
-                              print('📋 State OTP before submit: "${state.otp}"');
                               context.read<VerificationBloc>().add(
                                 const VerificationSubmitted(),
                               );
@@ -484,7 +484,7 @@ class _OTPBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 48,
+      width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
