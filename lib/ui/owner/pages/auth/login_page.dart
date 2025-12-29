@@ -16,97 +16,172 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    context.read<LoginBloc>().add(const LoginLoadCurrentUser());
+    // context.read<LoginBloc>().add(const LoginLoadCurrentUser());
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleLogin() {
+    // Unfocus untuk dismiss keyboard
+    _emailFocusNode.unfocus();
+    _passwordFocusNode.unfocus();
+
+    context.read<LoginBloc>().add(const LoginSubmitted());
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<LoginBloc, LoginState>(
-      listener: (context, state) {
-        if (state.status == LoginStatus.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login berhasil!'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(milliseconds: 1500),
-            ),
-          );
-
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              Navigator.pushReplacementNamed(context, AppRoutes.authChecker);
-            }
-          });
-        }
-        else if (state.status == LoginStatus.failure) {
-          FloatingMessage.show(
-            context,
-            message: state.errorMessage ?? 'Login gagal',
-            backgroundColor: Colors.red,
-            icon: Icons.error_outline,
-            duration: const Duration(seconds: 3),
-          );
-
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              context.read<LoginBloc>().add(const LoginResetStatus());
-            }
-          });
-        }
-      },
+      listener: _handleBlocListener,
       child: Scaffold(
-        resizeToAvoidBottomInset: true,  //  Tambah ini
+        resizeToAvoidBottomInset: true,
         backgroundColor: Colors.white,
         body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                const _LoginHeader(),
-                Padding(
-                  padding: EdgeInsets.only(  //  Ubah jadi EdgeInsets.only
-                    left: 24,
-                    right: 24,
-                    top: 0,
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 24,  // Magine
-                  ),
+          child: GestureDetector(
+            onTap: () {
+              // Dismiss keyboard when tap outside
+              _emailFocusNode.unfocus();
+              _passwordFocusNode.unfocus();
+            },
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top,
+                ),
+                child: IntrinsicHeight(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
-                      const _EmailField(),
-                      const SizedBox(height: 24),
-                      _PasswordField(
-                        obscurePassword: _obscurePassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                      const _LoginHeader(),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            left: 24,
+                            right: 24,
+                            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _EmailField(
+                                controller: _emailController,
+                                focusNode: _emailFocusNode,
+                                onSubmitted: () => _passwordFocusNode.requestFocus(),
+                              ),
+                              const SizedBox(height: 24),
+                              _PasswordField(
+                                controller: _passwordController,
+                                focusNode: _passwordFocusNode,
+                                obscurePassword: _obscurePassword,
+                                onToggleVisibility: () {
+                                  setState(() => _obscurePassword = !_obscurePassword);
+                                },
+                                onSubmitted: _handleLogin,
+                              ),
+                              const SizedBox(height: 24),
+                              const _SignUpPrompt(),
+                              const SizedBox(height: 16),
+                              const _ResendOtpPrompt(),
+                              const SizedBox(height: 32),
+                              _LoginButton(onPressed: _handleLogin),
+                              const SizedBox(height: 16),
+                              const _ForgotPasswordPrompt()
+                            ],
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 24),
-                      const _SignUpPrompt(),
-                      const SizedBox(height: 16),
-                      const _ResendOtpPrompt(),
-                      const SizedBox(height: 32),
-                      const _LoginButton(),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ),
-      );
+    );
+  }
+
+  void _handleBlocListener(BuildContext context, LoginState state) {
+    switch (state.status) {
+      case LoginStatus.needsVerification:
+        _navigateToVerification(context, state);
+        break;
+      case LoginStatus.success:
+        _handleLoginSuccess(context);
+        break;
+      case LoginStatus.failure:
+        if (state.errorMessage != null) {
+          _showErrorMessage(context, state.errorMessage!);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _navigateToVerification(BuildContext context, LoginState state) {
+    Navigator.pushReplacementNamed(
+      context,
+      AppRoutes.verification,
+      arguments: {
+        'userId': state.userId,
+        'email': state.userEmail,
+      },
+    );
+  }
+
+  void _handleLoginSuccess(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Login berhasil!'),
+        backgroundColor: primaryGreenColor,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.authChecker);
+      }
+    });
+  }
+
+  void _showErrorMessage(BuildContext context, String message) {
+    FloatingMessage.show(
+      context,
+      message: message,
+      backgroundColor: Colors.red,
+      icon: Icons.error_outline,
+      duration: const Duration(seconds: 3),
+    );
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        context.read<LoginBloc>().add(const LoginResetStatus());
+      }
+    });
   }
 }
 
-// ---------------- Header Section ----------------
+// ==================== HEADER ====================
 class _LoginHeader extends StatelessWidget {
   const _LoginHeader();
 
@@ -117,12 +192,15 @@ class _LoginHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SizedBox(
-            height: 95,
-            width: 95,
-            child: Image.asset(
-              'assets/icon/auropay_logo.png',
-              fit: BoxFit.contain,
+          Hero(
+            tag: 'app_logo',
+            child: SizedBox(
+              height: 95,
+              width: 95,
+              child: Image.asset(
+                'assets/icon/auropay_logo.png',
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ],
@@ -131,13 +209,24 @@ class _LoginHeader extends StatelessWidget {
   }
 }
 
-// ---------------- Email Field ----------------
+// ==================== EMAIL FIELD ====================
 class _EmailField extends StatelessWidget {
-  const _EmailField();
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onSubmitted;
+
+  const _EmailField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LoginBloc, LoginState>(
+      buildWhen: (previous, current) =>
+      previous.email != current.email ||
+          previous.emailError != current.emailError,
       builder: (context, state) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,50 +242,25 @@ class _EmailField extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: controller,
+              focusNode: focusNode,
               onChanged: (value) {
                 context.read<LoginBloc>().add(LoginEmailChanged(value));
               },
+              onFieldSubmitted: (_) => onSubmitted(),
               style: const TextStyle(
                 fontFamily: fontType,
                 fontSize: 15,
               ),
-              decoration: InputDecoration(
+              decoration: _buildInputDecoration(
                 hintText: 'Masukan Email',
-                hintStyle: TextStyle(
-                  fontFamily: fontType,
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
                 errorText: state.emailError,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: primaryGreenColor,
-                    width: 2,
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.red),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                ),
+                prefixIcon: Icons.email_outlined,
               ),
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              enableSuggestions: false,
             ),
           ],
         );
@@ -205,19 +269,28 @@ class _EmailField extends StatelessWidget {
   }
 }
 
-// ---------------- Password Field ----------------
+// ==================== PASSWORD FIELD ====================
 class _PasswordField extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
   final bool obscurePassword;
   final VoidCallback onToggleVisibility;
+  final VoidCallback onSubmitted;
 
   const _PasswordField({
+    required this.controller,
+    required this.focusNode,
     required this.obscurePassword,
     required this.onToggleVisibility,
+    required this.onSubmitted,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LoginBloc, LoginState>(
+      buildWhen: (previous, current) =>
+      previous.password != current.password ||
+          previous.passwordError != current.passwordError,
       builder: (context, state) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,49 +306,21 @@ class _PasswordField extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: controller,
+              focusNode: focusNode,
               onChanged: (value) {
                 context.read<LoginBloc>().add(LoginPasswordChanged(value));
               },
+              onFieldSubmitted: (_) => onSubmitted(),
               obscureText: obscurePassword,
               style: const TextStyle(
                 fontFamily: fontType,
                 fontSize: 15,
               ),
-              decoration: InputDecoration(
+              decoration: _buildInputDecoration(
                 hintText: 'Masukan Kata Sandi',
-                hintStyle: TextStyle(
-                  fontFamily: fontType,
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
                 errorText: state.passwordError,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: primaryGreenColor,
-                    width: 2,
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.red),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                ),
+                prefixIcon: Icons.lock_outline,
                 suffixIcon: IconButton(
                   icon: Icon(
                     obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -284,6 +329,9 @@ class _PasswordField extends StatelessWidget {
                   onPressed: onToggleVisibility,
                 ),
               ),
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
             ),
           ],
         );
@@ -292,7 +340,57 @@ class _PasswordField extends StatelessWidget {
   }
 }
 
-// ---------------- Sign Up Prompt ----------------
+// ==================== INPUT DECORATION ====================
+InputDecoration _buildInputDecoration({
+  required String hintText,
+  String? errorText,
+  IconData? prefixIcon,
+  Widget? suffixIcon,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: TextStyle(
+      fontFamily: fontType,
+      color: Colors.grey[400],
+      fontSize: 14,
+    ),
+    errorText: errorText,
+    errorMaxLines: 2,
+    prefixIcon: prefixIcon != null
+        ? Icon(prefixIcon, color: Colors.grey[600])
+        : null,
+    suffixIcon: suffixIcon,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 14,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey[300]!),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(
+        color: primaryGreenColor,
+        width: 2,
+      ),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Colors.red),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Colors.red, width: 2),
+    ),
+  );
+}
+
+// ==================== SIGN UP PROMPT ====================
 class _SignUpPrompt extends StatelessWidget {
   const _SignUpPrompt();
 
@@ -306,18 +404,18 @@ class _SignUpPrompt extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey,
+            fontFamily: fontType,
           ),
         ),
         GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, AppRoutes.register);
-          },
+          onTap: () => Navigator.pushNamed(context, AppRoutes.register),
           child: const Text(
             'Daftar',
             style: TextStyle(
               fontSize: 14,
               color: primaryGreenColor,
               fontWeight: FontWeight.w600,
+              fontFamily: fontType,
             ),
           ),
         ),
@@ -326,13 +424,50 @@ class _SignUpPrompt extends StatelessWidget {
   }
 }
 
-// ---------------- Login Button ----------------
+// ==================== RESEND OTP PROMPT ====================
+class _ResendOtpPrompt extends StatelessWidget {
+  const _ResendOtpPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'Belum dapat kode OTP? ',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+            fontFamily: fontType,
+          ),
+        ),
+        GestureDetector(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.resendOtp),
+          child: const Text(
+            'Kirim Ulang',
+            style: TextStyle(
+              fontSize: 14,
+              color: primaryGreenColor,
+              fontWeight: FontWeight.w600,
+              fontFamily: fontType,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================== LOGIN BUTTON ====================
 class _LoginButton extends StatelessWidget {
-  const _LoginButton();
+  final VoidCallback onPressed;
+
+  const _LoginButton({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LoginBloc, LoginState>(
+      buildWhen: (previous, current) => previous.status != current.status,
       builder: (context, state) {
         final isLoading = state.status == LoginStatus.loading;
 
@@ -343,6 +478,7 @@ class _LoginButton extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryGreenColor,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey[300],
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -353,11 +489,7 @@ class _LoginButton extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            onPressed: isLoading
-                ? null
-                : () {
-              context.read<LoginBloc>().add(const LoginSubmitted());
-            },
+            onPressed: isLoading ? null : onPressed,
             child: isLoading
                 ? const SizedBox(
               height: 20,
@@ -375,36 +507,25 @@ class _LoginButton extends StatelessWidget {
   }
 }
 
-// Tambahkan di login_page.dart
-class _ResendOtpPrompt extends StatelessWidget {
-  const _ResendOtpPrompt();
+// ==================== FORGOT PASSWORD PROMPT ====================
+class _ForgotPasswordPrompt extends StatelessWidget {
+  const _ForgotPasswordPrompt();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          'Belum dapat kode OTP? ',
+    return Center(
+      child: TextButton(
+        onPressed: () => Navigator.pushNamed(context, AppRoutes.forgotPassword),
+        child: const Text(
+          'Lupa Kata Sandi?',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey,
+            color: primaryGreenColor,
+            fontWeight: FontWeight.w600,
+            fontFamily: fontType,
           ),
         ),
-        GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, AppRoutes.resendOtp);
-          },
-          child: const Text(
-            'Kirim Ulang',
-            style: TextStyle(
-              fontSize: 14,
-              color: primaryGreenColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
