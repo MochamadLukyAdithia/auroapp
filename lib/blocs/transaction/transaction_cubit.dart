@@ -25,7 +25,20 @@ class TransactionCubit extends Cubit<TransactionState> {
         super(const TransactionState());
 
   void loadProducts(List<ProductModel> products) {
-    emit(state.copyWith(availableProducts: products));
+    final updatedQuantities = Map<String, int>.from(state.productQuantities);
+
+    updatedQuantities.removeWhere((productId, qty) {
+      final product = products.firstWhere(
+            (p) => p.id.toString() == productId,
+        orElse: () => products.first,
+      );
+      return product.productStock == 0;
+    });
+
+    emit(state.copyWith(
+      availableProducts: products,
+      productQuantities: updatedQuantities,
+    ));
   }
 
   void loadPaymentMethods(List<pm.PaymentMethod> paymentMethods) {
@@ -34,14 +47,14 @@ class TransactionCubit extends Cubit<TransactionState> {
 
   void addProduct(ProductModel product) {
     final updated = Map<String, int>.from(state.productQuantities);
-    updated[product.id.toString()] = (updated[product.id] ?? 0) + 1;
+    updated[product.id.toString()] = (updated[product.id.toString()] ?? 0) + 1;
     emit(state.copyWith(productQuantities: updated));
   }
 
   void addQuantity(ProductModel product) {
-    final current = state.productQuantities[product.id] ?? 0;
+    final current = state.productQuantities[product.id.toString()] ?? 0;
     final stock = product.productStock;
-    if (current < stock) {
+    if (current < stock!) {
       final updated = Map<String, int>.from(state.productQuantities)
         ..[product.id.toString()] = current + 1;
       emit(state.copyWith(productQuantities: updated));
@@ -49,11 +62,11 @@ class TransactionCubit extends Cubit<TransactionState> {
   }
 
   void removeQuantity(ProductModel product) {
-    final current = state.productQuantities[product.id] ?? 0;
+    final current = state.productQuantities[product.id.toString()] ?? 0;
     if (current > 0) {
       final updated = Map<String, int>.from(state.productQuantities);
       if (current == 1) {
-        updated.remove(product.id);
+        updated.remove(product.id.toString());
       } else {
         updated[product.id.toString()] = current - 1;
       }
@@ -65,39 +78,26 @@ class TransactionCubit extends Cubit<TransactionState> {
     emit(state.copyWith(receivedAmount: amount));
   }
 
-  void setPaymentMethod(PaymentMethod method) {
-    emit(state.copyWith(
-      paymentMethod: method,
-      clearPaymentMethodDetail: true,
-    ));
+  void setPaymentMethod(pm.PaymentMethod method) {
+    emit(state.copyWith(selectedPaymentMethod: method));
   }
 
-  void setPaymentMethodWithDetail(PaymentMethod method, pm.PaymentMethod? detail) {
-    emit(state.copyWith(
-      paymentMethod: method,
-      selectedPaymentMethodDetail: detail,
-    ));
-  }
-
-  void completeDigitalPayment(PaymentMethod method) {
+  void completeDigitalPayment() {
     emit(state.copyWith(
       transactionDate: DateTime.now(),
-      paymentMethod: method,
       receivedAmount: state.finalTotal,
     ));
   }
-
   void completeCashPayment() {
     emit(state.copyWith(
       transactionDate: DateTime.now(),
-      paymentMethod: PaymentMethod.cash,
     ));
   }
 
   void completeTransaction() {
-    if (state.paymentMethod.isDigitalPayment) {
-      completeDigitalPayment(state.paymentMethod);
-    } else if (state.paymentMethod == PaymentMethod.cash) {
+    if (state.isDigitalPayment) {
+      completeDigitalPayment();
+    } else if (state.isCashPayment) {
       completeCashPayment();
     }
   }
@@ -211,20 +211,37 @@ class TransactionCubit extends Cubit<TransactionState> {
       }).toList();
 
       // Call API
+      // final response = await _repository.createTransaction(
+      //   transactionDate: state.transactionDate ?? DateTime.now(),
+      //   subtotal: state.subtotal,
+      //   transactionDiscount: state.discount,
+      //   transactionTax: 0, // Sesuaikan jika ada tax
+      //   totalTransaction: state.finalTotal,
+      //   nameOtherCost: state.otherCostsName.isEmpty ? null : state.otherCostsName,
+      //   otherCost: state.otherCosts,
+      //   totalPayment: state.receivedAmount ?? state.finalTotal,
+      //   changeAmount: state.changeAmount,
+      //   transactionDescription: state.notes.isEmpty ? null : state.notes,
+      //   totalProfit: state.netProfit,
+      //   customerId: state.selectedCustomer?.id,
+      //   companyPaymentMethodId: state.selectedPaymentMethodDetail?.id ?? 1, // Default ID
+      //   details: details,
+      // );
+
       final response = await _repository.createTransaction(
         transactionDate: state.transactionDate ?? DateTime.now(),
         subtotal: state.subtotal,
         transactionDiscount: state.discount,
-        transactionTax: 0, // Sesuaikan jika ada tax
+        transactionTax: 0,
         totalTransaction: state.finalTotal,
-        nameOtherCost: state.otherCostsName.isEmpty ? null : state.otherCostsName,
+        nameOtherCost: state.otherCostsName.trim().isEmpty ? null : state.otherCostsName.trim(),
         otherCost: state.otherCosts,
         totalPayment: state.receivedAmount ?? state.finalTotal,
         changeAmount: state.changeAmount,
-        transactionDescription: state.notes.isEmpty ? null : state.notes,
+        transactionDescription: state.notes.trim().isEmpty ? null : state.notes.trim(),
         totalProfit: state.netProfit,
         customerId: state.selectedCustomer?.id,
-        companyPaymentMethodId: state.selectedPaymentMethodDetail?.id ?? 1, // Default ID
+        companyPaymentMethodId: state.selectedPaymentMethod!.id,
         details: details,
       );
 
@@ -232,10 +249,8 @@ class TransactionCubit extends Cubit<TransactionState> {
         emit(state.copyWith(
           isLoading: false,
           completedTransaction: response.data,
+          shouldReloadProducts: true,
         ));
-
-        // Reset transaction setelah berhasil
-        resetTransaction();
       } else {
         emit(state.copyWith(
           isLoading: false,
@@ -315,6 +330,7 @@ class TransactionCubit extends Cubit<TransactionState> {
     emit(TransactionState(
       availableProducts: state.availableProducts,
       availablePaymentMethods: state.availablePaymentMethods,
+      shouldReloadProducts: true,
     ));
   }
 
@@ -336,7 +352,7 @@ class TransactionCubit extends Cubit<TransactionState> {
   void setDiscountPercent(int percent) {
     if (percent < 0) return;
     if (percent > 100) percent = 100;
-    final discountAmount = (state.totalGrossProfit * percent / 100).round();
+    final discountAmount = (state.totalAfterProductDiscount * percent / 100).round();
     emit(state.copyWith(discount: discountAmount));
   }
 
