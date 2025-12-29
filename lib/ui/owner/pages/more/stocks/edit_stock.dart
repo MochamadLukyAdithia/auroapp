@@ -36,7 +36,6 @@ class _EditStockPageState extends State<EditStockPage>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
-
   }
 
   void _onTabChanged() {
@@ -91,11 +90,8 @@ class ManageStockTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product Info Card
           ProductInfoCard(product: product),
           const SizedBox(height: 24),
-
-          // Stock In Section
           StockActionSection(
             title: 'Stok Masuk',
             icon: Icons.add_box,
@@ -106,8 +102,6 @@ class ManageStockTab extends StatelessWidget {
             actionType: StockActionType.stockIn,
           ),
           const SizedBox(height: 16),
-
-          // Stock Out Section
           StockActionSection(
             title: 'Stok Keluar',
             icon: Icons.remove_circle_outline,
@@ -222,8 +216,7 @@ class ProductInfoCard extends StatelessWidget {
   }
 }
 
-
-enum StockActionType { stockIn, stockOut}
+enum StockActionType { stockIn, stockOut }
 
 class StockActionSection extends StatelessWidget {
   final String title;
@@ -324,241 +317,255 @@ class StockActionSection extends StatelessWidget {
       context: context,
       builder: (dialogContext) => BlocProvider.value(
         value: stockBloc,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          titlePadding: const EdgeInsets.only(top: 20, left: 20, right: 20),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          backgroundColor: Colors.white,
-          title: Row(
-            children: [
-              Icon(
-                type == StockActionType.stockIn
-                    ? Icons.add_box_rounded
-                    : Icons.indeterminate_check_box_rounded,
-                color: type == StockActionType.stockIn
-                    ? primaryGreenColor
-                    : Colors.redAccent,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                type == StockActionType.stockIn ? 'Tambah Stok' : 'Kurangi Stok',
-                style: const TextStyle(
-                  fontFamily: fontType,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          // ✅ TAMBAHKAN INI - Content yang hilang!
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Input Jumlah
-              TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: 'Jumlah',
-                  hintText: 'Masukkan jumlah',
-                  suffixText: product.productUnits,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: primaryGreenColor, width: 1.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Input Keterangan
-              TextField(
-                controller: notesController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Keterangan',
-                  hintText: 'Tambahkan keterangan',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: primaryGreenColor, width: 1.4),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.only(right: 16, bottom: 10, left: 16),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Batal',
-                style: TextStyle(
-                  fontFamily: fontType,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            BlocConsumer<StockBloc, StockState>(
-              listener: (context, state) {
-                if (state is StockActionSuccess) {
-                  Navigator.pop(dialogContext);
-                  context.read<ProductBloc>().add(const LoadProducts());
-                  FloatingMessage.show(
-                    context,
-                    message: state.message,
-                    backgroundColor: primaryGreenColor,
-                  );
-                } else if (state is StockError) {
-                  FloatingMessage.show(
-                    context,
-                    message: state.message,
-                    backgroundColor: Colors.redAccent,
-                    position: FloatingMessagePosition.bottom,
-                  );
-                }
-              },
-              builder: (context, state) {
-                return ElevatedButton(
-                  onPressed: state is StockLoading
-                      ? null
-                      : () {
-                    final quantity = int.tryParse(quantityController.text);
-                    final notes = notesController.text.trim();
-
-                    if (quantity == null || quantity <= 0) {
-                      FloatingMessage.show(
-                        context,
-                        textOnly: true,
-                        message: "Jumlah tidak valid",
-                        position: FloatingMessagePosition.bottom,
-                      );
-                      return;
-                    }
-
-                    if (notes.isEmpty) {
-                      FloatingMessage.show(
-                        context,
-                        textOnly: true,
-                        message: "Deskripsi tidak boleh kosong",
-                        position: FloatingMessagePosition.bottom,
-                      );
-                      return;
-                    }
-
-                    switch (type) {
-                      case StockActionType.stockIn:
-                        stockBloc.add(AddStockIn(
-                          productId: product.id!,
-                          quantity: quantity,
-                          notes: notes,
-                        ));
-                        break;
-                      case StockActionType.stockOut:
-                        stockBloc.add(AddStockOut(
-                          productId: product.id!,
-                          quantity: quantity,
-                          notes: notes,
-                        ));
-                        break;
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: state is StockLoading
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : Text(
-                    'Simpan',
-                    style: const TextStyle(
-                      fontFamily: fontType,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
+        child: _StockDialogWithValidation(
+          type: type,
+          product: product,
+          buttonColor: buttonColor,
+          quantityController: quantityController,
+          notesController: notesController,
+          stockBloc: stockBloc,
         ),
       ),
     );
   }
 }
 
-// 🧩 Widget Kecil untuk TextField agar lebih clean
-class _CustomTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final String? suffix;
-  final int maxLines;
-  final TextInputType? keyboardType;
+// ✅ DIALOG DENGAN VALIDASI ERROR
+class _StockDialogWithValidation extends StatefulWidget {
+  final StockActionType type;
+  final ProductModel product;
+  final Color buttonColor;
+  final TextEditingController quantityController;
+  final TextEditingController notesController;
+  final StockBloc stockBloc;
 
-  const _CustomTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    this.suffix,
-    this.maxLines = 1,
-    this.keyboardType,
+  const _StockDialogWithValidation({
+    required this.type,
+    required this.product,
+    required this.buttonColor,
+    required this.quantityController,
+    required this.notesController,
+    required this.stockBloc,
   });
 
   @override
+  State<_StockDialogWithValidation> createState() => _StockDialogWithValidationState();
+}
+
+class _StockDialogWithValidationState extends State<_StockDialogWithValidation> {
+  String? errorMessage;
+
+  void _validateAndSubmit(BuildContext context) {
+    setState(() {
+      errorMessage = null;
+    });
+
+    final quantity = int.tryParse(widget.quantityController.text);
+    final notes = widget.notesController.text.trim();
+
+    if (quantity == null || quantity <= 0) {
+      setState(() {
+        errorMessage = "Jumlah tidak valid, harus lebih dari 0";
+      });
+      return;
+    }
+
+    if (notes.isEmpty) {
+      setState(() {
+        errorMessage = "Keterangan wajib diisi";
+      });
+      return;
+    }
+
+    switch (widget.type) {
+      case StockActionType.stockIn:
+        widget.stockBloc.add(AddStockIn(
+          productId: widget.product.id!,
+          quantity: quantity,
+          notes: notes,
+        ));
+        break;
+      case StockActionType.stockOut:
+        widget.stockBloc.add(AddStockOut(
+          productId: widget.product.id!,
+          quantity: quantity,
+          notes: notes,
+        ));
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      inputFormatters: keyboardType == TextInputType.number
-          ? [FilteringTextInputFormatter.digitsOnly]
-          : null,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        suffixText: suffix,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: primaryGreenColor, width: 1.4),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        labelStyle: TextStyle(
-          fontFamily: fontType,
-          color: Colors.grey[800],
-        ),
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titlePadding: const EdgeInsets.only(top: 20, left: 20, right: 20),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      backgroundColor: Colors.white,
+      title: Row(
+        children: [
+          Icon(
+            widget.type == StockActionType.stockIn
+                ? Icons.add_box_rounded
+                : Icons.indeterminate_check_box_rounded,
+            color: widget.type == StockActionType.stockIn
+                ? primaryGreenColor
+                : Colors.redAccent,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            widget.type == StockActionType.stockIn ? 'Tambah Stok' : 'Kurangi Stok',
+            style: const TextStyle(
+              fontFamily: fontType,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: widget.quantityController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Jumlah*',
+              hintText: 'Masukkan jumlah',
+              suffixText: widget.product.productUnits,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: primaryGreenColor, width: 1.4),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: widget.notesController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Keterangan*',
+              hintText: 'Tambahkan keterangan (wajib diisi)',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: primaryGreenColor, width: 1.4),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
+          if (errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.redAccent, width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+      actionsPadding: const EdgeInsets.only(right: 16, bottom: 10, left: 16, top: 8),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Batal',
+            style: TextStyle(
+              fontFamily: fontType,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        BlocConsumer<StockBloc, StockState>(
+          listener: (context, state) {
+            if (state is StockActionSuccess) {
+              Navigator.pop(context);
+              context.read<ProductBloc>().add(const LoadProducts());
+              FloatingMessage.show(
+                context,
+                message: state.message,
+                backgroundColor: primaryGreenColor,
+              );
+            } else if (state is StockError) {
+              FloatingMessage.show(
+                context,
+                message: state.message,
+                backgroundColor: Colors.redAccent,
+                position: FloatingMessagePosition.bottom,
+              );
+            }
+          },
+          builder: (context, state) {
+            return ElevatedButton(
+              onPressed: state is StockLoading ? null : () => _validateAndSubmit(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: widget.buttonColor,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: state is StockLoading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+                  : const Text(
+                'Simpan',
+                style: TextStyle(
+                  fontFamily: fontType,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
-
-
 
 // ==================== STOCK HISTORY TAB ====================
 class StockHistoryTab extends StatefulWidget {
@@ -570,7 +577,6 @@ class StockHistoryTab extends StatefulWidget {
 }
 
 class _StockHistoryTabState extends State<StockHistoryTab> {
-
   @override
   void initState() {
     super.initState();
@@ -620,14 +626,13 @@ class _StockHistoryTabState extends State<StockHistoryTab> {
 }
 
 class StockHistoryCard extends StatelessWidget {
-  final StockHistoryModel history; // ✅ FIX: Tambahkan tipe yang benar
+  final StockHistoryModel history;
 
   const StockHistoryCard({super.key, required this.history});
 
   @override
   Widget build(BuildContext context) {
-    // ✅ FIX: Sesuaikan dengan field di StockHistoryModel
-    final isIncrease = history.stockIn > 0; // stockIn > 0 = tambah, stockOut > 0 = kurang
+    final isIncrease = history.stockIn > 0;
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
     final quantityChange = isIncrease ? history.stockIn : -history.stockOut;
 
@@ -690,7 +695,7 @@ class StockHistoryCard extends StatelessWidget {
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               Text(
-                '${history.initialStock}', // ✅ FIX: initialStock
+                '${history.initialStock}',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ],
@@ -704,7 +709,7 @@ class StockHistoryCard extends StatelessWidget {
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               Text(
-                '${history.finalStock}', // ✅ FIX: finalStock
+                '${history.finalStock}',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ],
