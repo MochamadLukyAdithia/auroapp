@@ -4,11 +4,10 @@ import '../models/api_response.dart';
 import '../models/customer_model.dart';
 import 'dio.dart';
 
-
 class CustomerRepository {
-  final Dio _dio = dio(); // ✅ Gunakan Dio instance yang sudah ada
+  final Dio _dio = dio();
 
-  // ✅ Get All Customers (dengan pagination & search)
+  // ✅ Get All Customers (pagination & search)
   Future<ApiResponse<Map<String, dynamic>>> getCustomers({
     int page = 1,
     int? limit,
@@ -26,22 +25,19 @@ class CustomerRepository {
 
       final json = response.data;
 
-      // ✅ Backend menggunakan struktur: { meta: {...}, data: {...} }
       if (response.statusCode == 200) {
         final meta = json['meta'];
         final data = json['data'];
 
-        // Cek success dari meta
         final isSuccess = meta['status'] == true || meta['success'] == true;
 
         if (isSuccess) {
           final customerList = data['data'] as List;
-          final customers = customerList
-              .map((item) => Customer.fromJson(item))
-              .toList();
+          final customers =
+          customerList.map((item) => Customer.fromJson(item)).toList();
 
           return ApiResponse.success(
-            message: meta['message'] ?? 'Customers retrieved successfully',
+            message: meta['message'] ?? 'Data pelanggan berhasil ditampilkan',
             data: {
               'customers': customers,
               'current_page': data['current_page'] ?? 1,
@@ -55,23 +51,21 @@ class CustomerRepository {
       }
 
       return ApiResponse.error(
-        message: json['meta']?['message'] ?? 'Failed to get customers',
+        message: json['meta']?['message'] ?? 'Gagal menampilkan data pelanggan',
         code: json['meta']?['code'] ?? response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
-    } catch (e, stackTrace) {
-      print('Error in getCustomers: $e');
-      print('StackTrace: $stackTrace');
+    } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Terjadi kesalahan tidak diketahui',
         code: 500,
       );
     }
   }
 
-  // ✅ Get Customer by ID
-  Future<ApiResponse<Customer>> getCustomer(String id) async {
+  // ✅ Get Customer By ID
+  Future<ApiResponse<Customer>> getCustomer(int id) async {
     try {
       final response = await _dio.get('/customers/$id');
       final json = response.data;
@@ -82,7 +76,7 @@ class CustomerRepository {
 
         if (isSuccess) {
           return ApiResponse.success(
-            message: meta['message'] ?? 'Customer retrieved successfully',
+            message: meta['message'] ?? 'Data pelanggan berhasil ditampilkan',
             data: Customer.fromJson(json['data']),
             code: meta['code'] ?? response.statusCode ?? 200,
           );
@@ -90,14 +84,15 @@ class CustomerRepository {
       }
 
       return ApiResponse.error(
-        message: json['meta']?['message'] ?? 'Customer not found',
+        message: json['meta']?['message'] ??
+            'Pelanggan tidak dapat ditemukan atau sudah dihapus',
         code: json['meta']?['code'] ?? response.statusCode ?? 404,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Terjadi kesalahan tidak diketahui',
         code: 500,
       );
     }
@@ -117,21 +112,21 @@ class CustomerRepository {
 
       if (isSuccess) {
         return ApiResponse.success(
-          message: meta['message'] ?? 'Customer added successfully',
+          message: meta['message'] ?? 'Pelanggan berhasil ditambahkan',
           data: Customer.fromJson(json['data']),
           code: meta['code'] ?? response.statusCode ?? 200,
         );
       }
 
       return ApiResponse.error(
-        message: meta['message'] ?? 'Failed to add customer',
+        message: meta['message'] ?? 'Gagal menambahkan pelanggan',
         code: meta['code'] ?? response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Terjadi kesalahan tidak diketahui',
         code: 500,
       );
     }
@@ -151,28 +146,28 @@ class CustomerRepository {
 
       if (isSuccess) {
         return ApiResponse.success(
-          message: meta['message'] ?? 'Customer updated successfully',
+          message: meta['message'] ?? 'Data pelanggan berhasil diperbarui',
           data: Customer.fromJson(json['data']),
           code: meta['code'] ?? response.statusCode ?? 200,
         );
       }
 
       return ApiResponse.error(
-        message: meta['message'] ?? 'Failed to update customer',
+        message: meta['message'] ?? 'Gagal memperbarui data pelanggan',
         code: meta['code'] ?? response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Terjadi kesalahan tidak diketahui',
         code: 500,
       );
     }
   }
 
   // ✅ Delete Customer
-  Future<ApiResponse<void>> deleteCustomer(String id) async {
+  Future<ApiResponse<void>> deleteCustomer(int id) async {
     try {
       final response = await _dio.delete('/customers/$id/delete');
       final json = response.data;
@@ -181,39 +176,37 @@ class CustomerRepository {
 
       if (isSuccess) {
         return ApiResponse.success(
-          message: meta['message'] ?? 'Customer deleted successfully',
+          message: meta['message'] ?? 'Pelanggan berhasil dihapus',
           code: meta['code'] ?? response.statusCode ?? 200,
         );
       }
 
       return ApiResponse.error(
-        message: meta['message'] ?? 'Failed to delete customer',
+        message: meta['message'] ?? 'Gagal menghapus pelanggan',
         code: meta['code'] ?? response.statusCode ?? 500,
       );
     } on DioException catch (e) {
       return _handleDioError(e);
     } catch (e) {
       return ApiResponse.error(
-        message: 'Unexpected error: ${e.toString()}',
+        message: 'Terjadi kesalahan tidak diketahui',
         code: 500,
       );
     }
   }
 
-  // ✅ Handle Dio Errors
+  // ✅ Handle Dio Errors (Bahasa Indonesia)
   ApiResponse<T> _handleDioError<T>(DioException e) {
     if (e.response != null) {
       final json = e.response!.data;
-
-      // ✅ Handle struktur { meta: {...}, data: {...} }
       final meta = json['meta'];
 
-      // Handle validation errors (422)
+      // Error validasi (422)
       if (e.response!.statusCode == 422 && json['data'] != null) {
         final errors = json['data'] as Map<String, dynamic>?;
         final errorMessage = errors?.values.first is List
             ? (errors!.values.first as List).first.toString()
-            : meta?['message'] ?? 'Akun sudah terdaftar';
+            : meta?['message'] ?? 'Data tidak valid';
 
         return ApiResponse.error(
           message: errorMessage,
@@ -222,29 +215,30 @@ class CustomerRepository {
       }
 
       return ApiResponse.error(
-        message: meta?['message'] ?? e.message ?? 'Server error',
+        message: meta?['message'] ?? e.message ?? 'Terjadi kesalahan pada server',
         code: meta?['code'] ?? e.response!.statusCode ?? 500,
       );
     }
 
-    // Network errors
+    // Timeout koneksi
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
       return ApiResponse.error(
-        message: 'Connection timeout. Please check your internet connection.',
+        message: 'Koneksi timeout. Periksa koneksi internet Anda.',
         code: 408,
       );
     }
 
+    // Tidak ada internet
     if (e.type == DioExceptionType.connectionError) {
       return ApiResponse.error(
-        message: 'No internet connection. Please check your network.',
+        message: 'Tidak ada koneksi internet. Periksa jaringan Anda.',
         code: 503,
       );
     }
 
     return ApiResponse.error(
-      message: e.message ?? 'Network error occurred',
+      message: e.message ?? 'Terjadi kesalahan jaringan',
       code: 500,
     );
   }
