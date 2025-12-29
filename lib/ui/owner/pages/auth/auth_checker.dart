@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/theme.dart';
 import '../../../../data/repositories/company_repository.dart';
@@ -24,32 +25,36 @@ class _AuthCheckerState extends State<AuthChecker> {
 
   Future<void> _checkCompanyStatus() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload(); // ✅ Tambah ini
+
+      final hasCompletedOnboarding = prefs.getBool('onboarding_completed') ?? false;
+
+      if (!hasCompletedOnboarding) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+        return;
+      }
+      // Cek API untuk memastikan data masih ada
       final companyRepo = context.read<CompanyRepository>();
       final response = await companyRepo.getCompany();
 
       if (!mounted) return;
 
-      if (response.success) {
-        // Cek apakah data company ada atau null
-        if (response.data == null) {
-          // User belum setup company, ke onboarding
-          Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
-        } else {
-          // User sudah setup company, ke homepage
-          Navigator.pushReplacementNamed(context, AppRoutes.homepage);
-        }
+      if (response.success && response.data != null) {
+        Navigator.pushReplacementNamed(context, AppRoutes.homepage);
       } else {
-        // Error, ke onboarding untuk safety
+        // Data hilang dari backend, minta setup ulang
+        await prefs.setBool('onboarding_completed', false);
         Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
       }
     } catch (e) {
       if (!mounted) return;
-      // Error, ke onboarding
       Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Colors.white,
