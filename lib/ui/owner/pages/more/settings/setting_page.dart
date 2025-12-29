@@ -28,7 +28,17 @@ class SettingPage extends StatelessWidget {
           const Divider(height: 1),
 
           MenuTile(
-            icon: Icons.business,
+            icon: Icons.key_off,
+            title: 'Ganti Kata Sandi',
+            onTap: () {
+              Navigator.pushNamed(context, AppRoutes.changePassword);
+            },
+          ),
+
+          const Divider(height: 1),
+
+          MenuTile(
+            icon: Icons.person,
             title: 'Profil Owner',
             onTap: () {
               Navigator.pushNamed(context, AppRoutes.ownerProfile);
