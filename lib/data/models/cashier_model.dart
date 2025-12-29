@@ -5,7 +5,7 @@ class Cashier extends Equatable {
   final int? id;
   final String fullName;
   final String email;
-  final String password;
+  final String? password;
   final String passwordConfirmation;
   final String phoneNumber;
   final String? userAddress;
