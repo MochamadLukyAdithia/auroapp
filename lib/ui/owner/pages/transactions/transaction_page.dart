@@ -28,6 +28,7 @@ class _TransactionPageState extends State<TransactionPage> {
     _loadProducts();
   }
 
+
   void _loadProducts() {
     final productBloc = context.read<ProductBloc>();
     final productState = productBloc.state;
@@ -66,6 +67,22 @@ class _TransactionPageState extends State<TransactionPage> {
               context.read<TransactionCubit>().loadPaymentMethods(
                 paymentMethodState.paymentMethods,
               );
+            }
+          },
+        ),
+        BlocListener<TransactionCubit, TransactionState>(
+          listener: (context, transactionState) {
+            // Kalau flag shouldReloadProducts = true, reload products
+            if (transactionState.shouldReloadProducts) {
+              context.read<ProductBloc>().add(const LoadProducts());
+
+              // Reset flag setelah 100ms biar ga loop
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (context.mounted) {
+                  final cubit = context.read<TransactionCubit>();
+                  cubit.emit(cubit.state.copyWith(shouldReloadProducts: false));
+                }
+              });
             }
           },
         ),
@@ -149,7 +166,7 @@ class _TransactionPageState extends State<TransactionPage> {
             }
 
             return PaymentButton(
-              onPressed: () {
+              onPressed: () async {  // ✅ TAMBAH async
                 final state = context.read<TransactionCubit>().state;
                 bool stockValid = true;
                 String? errorMessage;
@@ -157,7 +174,7 @@ class _TransactionPageState extends State<TransactionPage> {
                 for (var product in state.selectedItems) {
                   final qty = state.getQuantity(product.id.toString());
                   final stock = product.productStock;
-                  if (qty > stock) {
+                  if (qty > stock!) {
                     stockValid = false;
                     errorMessage = 'Stok ${product.productName} tidak mencukupi!\n'
                         'Tersedia: $stock, Dipilih: $qty';
@@ -165,18 +182,28 @@ class _TransactionPageState extends State<TransactionPage> {
                   }
                 }
                 if (!stockValid) {
-                  FloatingMessage.show(context, message: errorMessage, backgroundColor: primaryBlueColor);
+                  FloatingMessage.show(context, message: errorMessage, backgroundColor: Colors.red);
                   return;
                 }
-                Navigator.push(
+
+                // ✅ AWAIT hasil navigation
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => BlocProvider.value(
-                      value: context.read<TransactionCubit>(),
+                    builder: (_) => MultiBlocProvider(  // ✅ Ubah jadi MultiBlocProvider
+                      providers: [
+                        BlocProvider.value(value: context.read<TransactionCubit>()),
+                        BlocProvider.value(value: context.read<ProductBloc>()),  // ✅ Tambah ini
+                      ],
                       child: const DetailTransaction(),
                     ),
                   ),
                 );
+
+                // ✅ RELOAD products kalau transaksi berhasil
+                if (result == true && context.mounted) {
+                  context.read<ProductBloc>().add(const LoadProducts());
+                }
               },
               quantity: totalQuantity,
               price: 'Rp ${state.totalPayment}',
@@ -306,7 +333,7 @@ class TransactionSearchBar extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(50),
+            borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -359,11 +386,11 @@ class ProductTransactionCard extends StatelessWidget {
       builder: (context, state) {
         final quantity = state.getQuantity(product.id.toString());
         final currentStock = product.productStock;
-        final remainingStock = currentStock - quantity;
+        final remainingStock = currentStock! - quantity;
         final isLowStock = remainingStock > 0 && remainingStock <= 5;
         final isOutOfStock = quantity >= currentStock;
         final hasStock = product.productStock != null;
-        final hasDiscount = product.productDiscount !> 0;
+        final hasDiscount = product.productDiscount > 0;
 
         return Stack(
           children: [
@@ -405,17 +432,34 @@ class ProductTransactionCard extends StatelessWidget {
                       children: [
                         // Gambar produk
                         Container(
-                          width: 56,
-                          height: 56,
+                          width: 50,
+                          height: 50,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: Colors.grey[100],
+                            border: Border.all(color: Colors.grey[300]!, width: 1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
-                            Icons.image,
-                            color: Colors.grey.shade400,
-                            size: 28,
-                          ),
+                          child: product.productPhoto != null && product.productPhoto!.isNotEmpty
+                              ? Image.network(
+                            product.productPhoto!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(Icons.image, color: Colors.grey[400], size: 28);
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  strokeWidth: 2,
+                                ),
+                              );
+                            },
+                          )
+                              : Icon(Icons.image, color: Colors.grey[400], size: 28),
                         ),
                         const SizedBox(width: 12),
 
@@ -499,7 +543,7 @@ class ProductTransactionCard extends StatelessWidget {
                             if (hasDiscount) ...[
                               // Harga setelah diskon
                               Text(
-                                'Rp ${(product.sellingPrice * (1 - product.productDiscount !/ 100)).toInt()}',
+                                'Rp ${(product.sellingPrice * (1 - product.productDiscount / 100)).toInt()}',
                                 style: const TextStyle(
                                   fontFamily: fontType,
                                   fontWeight: FontWeight.w600,
@@ -531,7 +575,7 @@ class ProductTransactionCard extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(3),
                                     ),
                                     child: Text(
-                                      '-${product.productDiscount?.toInt()}%',
+                                      '-${product.productDiscount.toInt()}%',
                                       style: TextStyle(
                                         fontFamily: fontType,
                                         fontSize: 8,
@@ -683,6 +727,7 @@ class ProductTransactionCard extends StatelessWidget {
     );
   }
 }
+
 class PaymentButton extends StatelessWidget {
   final VoidCallback onPressed;
   final int quantity;
