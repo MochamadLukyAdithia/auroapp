@@ -1,13 +1,13 @@
 import 'package:equatable/equatable.dart';
-
 import '../../core/utils/auth_service.dart';
 
 class Owner extends Equatable {
   final int id;
   final String fullName;
   final String email;
+  final String password;
+  final String confirmPassword;
   final String phoneNumber;
-  final String userAddress;
   final int? companyId;
   final String role;
   final DateTime? createdAt;
@@ -17,8 +17,9 @@ class Owner extends Equatable {
     required this.id,
     required this.fullName,
     required this.email,
+    required this.password,
+    required this.confirmPassword,
     required this.phoneNumber,
-    required this.userAddress,
     this.companyId,
     this.role = AuthService.ROLE_OWNER,
     this.createdAt,
@@ -29,6 +30,8 @@ class Owner extends Equatable {
     int? id,
     String? fullName,
     String? email,
+    String? password,
+    String? confirmPassword,
     String? phoneNumber,
     String? userAddress,
     String? role,
@@ -37,20 +40,21 @@ class Owner extends Equatable {
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
+      password: password ?? this.password,
+      confirmPassword: confirmPassword ?? this.confirmPassword,
       phoneNumber: phoneNumber ?? this.phoneNumber,
-      userAddress: userAddress ?? this.userAddress,
       role: role ?? this.role,
     );
   }
 
-  // FromJson untuk data dari API (response)
   factory Owner.fromJson(Map<String, dynamic> json) {
     return Owner(
       id: json['id'] ?? 0,
       fullName: json['name'] ?? json['full_name'] ?? '',
       email: json['email'] ?? '',
+      password: json['password'] ?? '',
+      confirmPassword: json['confirmPassword'] ?? '',
       phoneNumber: json['phone'] ?? json['phone_number'] ?? json['noTelephone'] ?? '',
-      userAddress: json['address'] ?? json['user_address'] ?? json['store_address'] ?? '',
       companyId: json['company_id'] ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
@@ -62,24 +66,24 @@ class Owner extends Equatable {
     );
   }
 
-  // ToJson untuk kirim data ke API (request register)
   Map<String, dynamic> toJson() {
     return {
       'full_name': fullName,
       'email': email,
+      'password': password,
+      'confirmPassword': confirmPassword,
       'phone_number': phoneNumber,
-      'user_address': userAddress,
     };
   }
 
+  // ✅ FIXED: Tidak kirim confirmPassword ke backend (security best practice)
   Map<String, dynamic> toRegisterJson(String password, String passwordConfirmation) {
     return {
       'name': fullName,
       'email': email,
       'password': password,
-      'confirmPassword': passwordConfirmation,
+      'confirmPassword': passwordConfirmation, // Backend Laravel butuh ini untuk validasi same:password
       'noTelephone': phoneNumber,
-      'address': userAddress,
     };
   }
 
@@ -88,8 +92,9 @@ class Owner extends Equatable {
       'id': id,
       'full_name': fullName,
       'email': email,
+      'password': password,
+      'confirmPassword': confirmPassword,
       'phone_number': phoneNumber,
-      'user_address': userAddress,
       'company_id': companyId,
       'role': role,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
@@ -98,28 +103,45 @@ class Owner extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, fullName, email, phoneNumber, userAddress, companyId, role, createdAt, updatedAt];
+  List<Object?> get props => [id, fullName, email, password, confirmPassword, phoneNumber, companyId, role, createdAt, updatedAt];
 }
 
+// ✅ FIXED: Tambahkan error details dari backend
 class RegisterResponse {
   final bool success;
   final String? message;
   final RegisterData? data;
-  final bool? otpSent;
+  final Map<String, String>? errors; // ✅ NEW: untuk error spesifik per field
 
   RegisterResponse({
     required this.success,
     this.message,
     this.data,
-    this.otpSent
+    this.errors,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
     final meta = json['meta'];
+    final data = json['data'];
+
+    // ✅ Extract error details jika ada
+    Map<String, String>? fieldErrors;
+    if (data != null && data is Map<String, dynamic>) {
+      // Cek apakah data berisi error messages (dari backend Laravel)
+      if (data.containsKey('email') || data.containsKey('phone')) {
+        fieldErrors = {};
+        if (data['email'] != null) fieldErrors['email'] = data['email'].toString();
+        if (data['phone'] != null) fieldErrors['phone'] = data['phone'].toString();
+      }
+    }
+
     return RegisterResponse(
-      success: (meta?['code'] == 200) || (meta?['code'] == 201), // ✅ Cek code aja
+      success: (meta?['code'] == 200) || (meta?['code'] == 201),
       message: meta?['message'],
-      data: json['data'] != null ? RegisterData.fromJson(json['data']) : null,
+      data: data != null && (meta?['code'] == 200 || meta?['code'] == 201)
+          ? RegisterData.fromJson(data)
+          : null,
+      errors: fieldErrors,
     );
   }
 }
@@ -148,7 +170,6 @@ class RegisterData {
   }
 }
 
-// resend from login
 class ResendOtpResponse {
   final bool success;
   final String message;
@@ -163,7 +184,6 @@ class ResendOtpResponse {
   });
 
   factory ResendOtpResponse.fromJson(Map<String, dynamic> json) {
-    // Parse struktur ResponseFormatter Laravel
     final meta = json['meta'];
     final data = json['data'];
 
