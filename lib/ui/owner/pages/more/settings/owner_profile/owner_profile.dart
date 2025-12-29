@@ -8,8 +8,20 @@ import '../../../../../../blocs/owner/owner_state.dart';
 import '../../../../../../data/models/owner_model.dart';
 import 'owner_profile_update.dart';
 
-class OwnerProfile extends StatelessWidget {
+class OwnerProfile extends StatefulWidget {
   const OwnerProfile({super.key});
+
+  @override
+  State<OwnerProfile> createState() => _OwnerProfileState();
+}
+
+class _OwnerProfileState extends State<OwnerProfile> {
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Load profile saat halaman dibuka
+    context.read<ProfileCubit>().loadProfile();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -293,11 +305,11 @@ class ProfileInfoCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Colors.grey[200], height: 1),
           ),
-          ProfileInfoItem(
-            icon: Icons.location_on_rounded,
-            label: 'Alamat',
-            value: owner.userAddress,
-          ),
+          // ProfileInfoItem(
+          //   icon: Icons.location_on_rounded,
+          //   label: 'Alamat',
+          //   value: owner.userAddress,
+          // ),
         ],
       ),
     );
@@ -402,8 +414,9 @@ class EditButton extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                // ✅ Gunakan await dan then refresh setelah kembali
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => BlocProvider.value(
@@ -412,6 +425,11 @@ class EditButton extends StatelessWidget {
                     ),
                   ),
                 );
+
+                // ✅ Refresh data setelah kembali dari edit
+                if (context.mounted) {
+                  context.read<ProfileCubit>().loadProfile();
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,

@@ -5,6 +5,7 @@ import 'package:pos_mobile/ui/widgets/custom_app_bar.dart';
 import '../../../../../../blocs/owner/owner_cubit.dart';
 import '../../../../../../blocs/owner/owner_state.dart';
 import '../../../../../../data/models/owner_model.dart';
+import '../../../../../widgets/floating_message.dart';
 
 class OwnerProfileUpdate extends StatefulWidget {
   final Owner? owner;
@@ -28,9 +29,9 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
 
     if (widget.owner != null) {
       _nameController.text = widget.owner!.fullName;
-      _emailController.text = widget.owner!.email;
+      // _emailController.text = widget.owner!.email;
       _phoneController.text = widget.owner!.phoneNumber;
-      _addressController.text = widget.owner!.userAddress;
+      // _addressController.text = widget.owner!.userAddress;
     } else {
       _loadOwnerData();
     }
@@ -43,9 +44,9 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
     if (owner != null && mounted) {
       setState(() {
         _nameController.text = owner.fullName;
-        _emailController.text = owner.email;
+        // _emailController.text = owner.email;
         _phoneController.text = owner.phoneNumber;
-        _addressController.text = owner.userAddress;
+        // _addressController.text = owner.userAddress;
       });
     }
   }
@@ -64,8 +65,8 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
       context.read<ProfileCubit>().updateProfile(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
-        address: _addressController.text.trim(),
-        email: _emailController.text.trim(),
+        // address: _addressController.text.trim(),
+        // email: _emailController.text.trim(),
       );
     }
   }
@@ -82,21 +83,17 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
       body: BlocListener<ProfileCubit, ProfileState>(
         listener: (context, state) {
           if (state is ProfileUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
+            FloatingMessage.show(
+              context,
+              message: state.message,
+              backgroundColor: primaryGreenColor,
             );
             Navigator.pop(context);
           } else if (state is ProfileUpdateError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
+            FloatingMessage.show(
+              context,
+              message: state.message,
+              backgroundColor: Colors.red,
             );
           }
         },
@@ -122,23 +119,23 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
-                      _InputField(
-                        controller: _emailController,
-                        label: 'Email',
-                        icon: Icons.email_rounded,
-                        hint: 'Masukkan email',
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Email tidak boleh kosong';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Email tidak valid';
-                          }
-                          return null;
-                        },
-                      ),
+                      // const SizedBox(height: 16),
+                      // _InputField(
+                      //   controller: _emailController,
+                      //   label: 'Email',
+                      //   icon: Icons.email_rounded,
+                      //   hint: 'Masukkan email',
+                      //   keyboardType: TextInputType.emailAddress,
+                      //   validator: (value) {
+                      //     if (value == null || value.trim().isEmpty) {
+                      //       return 'Email tidak boleh kosong';
+                      //     }
+                      //     if (!value.contains('@')) {
+                      //       return 'Email tidak valid';
+                      //     }
+                      //     return null;
+                      //   },
+                      // ),
                       const SizedBox(height: 16),
                       _InputField(
                         controller: _phoneController,
@@ -153,20 +150,20 @@ class _ProfileProfileUpdateState extends State<OwnerProfileUpdate> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
-                      _InputField(
-                        controller: _addressController,
-                        label: 'Alamat',
-                        icon: Icons.location_on_rounded,
-                        hint: 'Masukkan alamat lengkap',
-                        maxLines: 3,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Alamat tidak boleh kosong';
-                          }
-                          return null;
-                        },
-                      ),
+                      // const SizedBox(height: 16),
+                      // _InputField(
+                      //   controller: _addressController,
+                      //   label: 'Alamat',
+                      //   icon: Icons.location_on_rounded,
+                      //   hint: 'Masukkan alamat lengkap',
+                      //   maxLines: 3,
+                      //   validator: (value) {
+                      //     if (value == null || value.trim().isEmpty) {
+                      //       return 'Alamat tidak boleh kosong';
+                      //     }
+                      //     return null;
+                      //   },
+                      // ),
                     ],
                   ),
                 ),
