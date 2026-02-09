@@ -1,4 +1,4 @@
-# pos_mobile
+# auropay_mobile
 
 A new Flutter project.
 
