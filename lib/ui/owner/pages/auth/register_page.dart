@@ -119,10 +119,16 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 24),
                     const _PhoneField(),
+
+                    const SizedBox(height: 24),
+                    const _SourceInfoDropdown(), // dropdown baru
+
                     const SizedBox(height: 24),
                     const _LoginPrompt(),
                     const SizedBox(height: 32),
+
                     const _RegisterButton(),
+
                   ],
                 ),
               ),
@@ -130,6 +136,85 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       );
+  }
+}
+// ---------------- Source Info Dropdown ----------------
+class _SourceInfoDropdown extends StatefulWidget {
+  const _SourceInfoDropdown();
+
+  @override
+  State<_SourceInfoDropdown> createState() => _SourceInfoDropdownState();
+}
+
+class _SourceInfoDropdownState extends State<_SourceInfoDropdown> {
+  String? selectedValue;
+
+  final List<String> items = [
+    "Kementerian",
+    "UMKM",
+    "Teman/Saudara",
+    "Website",
+    "Tiktok",
+    "Instagram",
+    "Facebook",
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Dari mana Anda mengetahui informasi tentang AURO?',
+          style: TextStyle(
+            fontFamily: fontType,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: selectedValue,
+          hint: const Text("Pilih sumber informasi"),
+          items: items.map((item) {
+            return DropdownMenuItem(
+              value: item,
+              child: Text(
+                item,
+                style: const TextStyle(fontFamily: fontType),
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              selectedValue = value;
+            });
+          },
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: primaryGreenColor,
+                width: 2,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

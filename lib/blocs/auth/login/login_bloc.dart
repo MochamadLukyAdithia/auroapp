@@ -251,7 +251,6 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     } else {
       errorMessage = 'Terjadi kesalahan. Silakan coba lagi.';
     }
-
     emit(state.copyWith(
       status: LoginStatus.failure,
       errorMessage: errorMessage,

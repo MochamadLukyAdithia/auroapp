@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Dio dio() {
   Dio dio = Dio();
-
   // SSL Certificate bypass (untuk development)
   dio.httpClientAdapter = IOHttpClientAdapter(
     createHttpClient: () {
@@ -16,7 +15,7 @@ Dio dio() {
   );
 
   // Base URL & Headers
-  dio.options.baseUrl = "http://10.0.2.2:8000/api/v1";
+  dio.options.baseUrl = "http://10.132.1.237:8000/api/v1";
   dio.options.headers['accept'] = 'application/json';
   dio.options.connectTimeout = const Duration(seconds: 30);
   dio.options.receiveTimeout = const Duration(seconds: 30);

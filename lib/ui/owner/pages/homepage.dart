@@ -115,7 +115,7 @@ class _HomepageState extends State<Homepage> with TickerProviderStateMixin {
             );
           }
 
-          return Container(
+          return SingleChildScrollView(
             // decoration: BoxDecoration(
             //   gradient: LinearGradient(
             //     begin: Alignment.topLeft,
@@ -145,13 +145,14 @@ class _HomepageState extends State<Homepage> with TickerProviderStateMixin {
                           const SizedBox(height: 16),
                           const _DateTimeInfo(),
                           const SizedBox(height: 24),
-                          if (_isCashier) _buildRoleBadge(),
+                          // if (_isCashier) _buildRoleBadge(),
                           _DashboardCards(
                             state: state,
                             formatCurrency: _formatCurrency,
                           ),
                           // ✅ Tambahan spacing di bawah untuk memastikan bisa scroll
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
+                          // if(_isCashier) SizedBox(height: 100,)
                         ],
                       ),
                     ),
@@ -366,8 +367,10 @@ class _DateTimeInfo extends StatelessWidget {
       ),
       child: Row(
         children: [
+          /// TIME
           Expanded(
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -379,13 +382,6 @@ class _DateTimeInfo extends StatelessWidget {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryGreenColor.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: const Icon(
                     Icons.access_time,
@@ -393,24 +389,28 @@ class _DateTimeInfo extends StatelessWidget {
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  timeFormat.format(now),
-                  style: const TextStyle(
-                    fontFamily: fontType,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    timeFormat.format(now),
+                    style: const TextStyle(
+                      fontFamily: fontType,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(width: 12),
+
+          /// DATE
           Expanded(
             flex: 2,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -419,13 +419,6 @@ class _DateTimeInfo extends StatelessWidget {
                       colors: [Colors.blue, Colors.blue.shade600],
                     ),
                     borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: const Icon(
                     Icons.calendar_today,
@@ -434,16 +427,19 @@ class _DateTimeInfo extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Flexible(
+
+                /// IMPORTANT FIX
+                Expanded(
                   child: Text(
                     dateFormat.format(now),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontFamily: fontType,
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.grey.shade800,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -471,6 +467,7 @@ class _DashboardCards extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+
       children: [
         Row(
           children: [
