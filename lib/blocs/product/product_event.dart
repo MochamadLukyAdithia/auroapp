@@ -78,6 +78,16 @@ class UpdateProduct extends ProductEvent {
   List<Object?> get props => [product, photoFile];
 }
 
+class CheckProductCode extends ProductEvent {
+  final String code;
+  final int? excludeId;
+
+  const CheckProductCode({required this.code, this.excludeId});
+
+  @override
+  List<Object?> get props => [code, excludeId];
+}
+
 class DeleteProduct extends ProductEvent {
   final int productId;
 

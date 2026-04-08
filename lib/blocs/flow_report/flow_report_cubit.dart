@@ -123,7 +123,7 @@ class FinancialReportState extends Equatable {
   double get totalSales {
     return filteredTransactions.fold<double>(
       0,
-          (sum, t) => sum + t.bayar, // ✅ Gunakan field 'bayar' dari TransactionReport
+          (sum, t) => sum + t.totalPenjualan, // ✅ Gunakan field 'bayar' dari TransactionReport
     );
   }
 

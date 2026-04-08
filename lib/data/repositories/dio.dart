@@ -15,12 +15,12 @@ Dio dio() {
   );
 
   // Base URL & Headers
-  dio.options.baseUrl = "http://10.132.1.237:8000/api/v1";
+  dio.options.baseUrl = "https://api.auroapp.id//api/v1";
   dio.options.headers['accept'] = 'application/json';
   dio.options.connectTimeout = const Duration(seconds: 30);
   dio.options.receiveTimeout = const Duration(seconds: 30);
 
-  // ✅ Interceptor untuk auto-attach token
+  // Interceptor untuk auto-attach token
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {

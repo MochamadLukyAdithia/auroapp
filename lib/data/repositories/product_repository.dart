@@ -240,4 +240,22 @@ class ProductRepository {
       );
     }
   }
+  // product_repository.dart
+  Future<bool> checkProductCode(String code, {int? excludeId}) async {
+    try {
+      final queryParams = <String, dynamic>{'code': code};
+      if (excludeId != null) queryParams['exclude_id'] = excludeId;
+
+      final response = await _dio.get(
+        '/products/check-code',
+        queryParameters: queryParams,
+      );
+
+      return response.data['exists'] == true;
+    } on DioException catch (_) {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

@@ -371,7 +371,7 @@ class _FlowReportPageState extends State<FlowReportPage> {
         'date': DateTime.parse(transaction.tanggal), // ✅ Parse dari string
         'type': 'sales',
         'description': 'Penjualan #${transaction.kodeTransaksi}',
-        'amount': transaction.bayar.toInt(), // ✅ Convert ke int untuk grouping
+        'amount': transaction.totalPenjualan.toInt(), // ✅ Convert ke int untuk grouping
         'profit': transaction.keuntungan.toInt(),
         'transaction': transaction, // ✅ Simpan object asli
       });

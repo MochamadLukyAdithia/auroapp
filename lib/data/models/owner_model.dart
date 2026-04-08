@@ -23,7 +23,7 @@ class Owner extends Equatable {
     this.companyId,
     this.role = AuthService.ROLE_OWNER,
     this.createdAt,
-    this.updatedAt
+    this.updatedAt,
   });
 
   Owner copyWith({
@@ -33,7 +33,6 @@ class Owner extends Equatable {
     String? password,
     String? confirmPassword,
     String? phoneNumber,
-    String? userAddress,
     String? role,
   }) {
     return Owner(
@@ -54,7 +53,8 @@ class Owner extends Equatable {
       email: json['email'] ?? '',
       password: json['password'] ?? '',
       confirmPassword: json['confirmPassword'] ?? '',
-      phoneNumber: json['phone'] ?? json['phone_number'] ?? json['noTelephone'] ?? '',
+      phoneNumber:
+      json['phone'] ?? json['phone_number'] ?? json['noTelephone'] ?? '',
       companyId: json['company_id'] ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'])
@@ -76,14 +76,20 @@ class Owner extends Equatable {
     };
   }
 
-  // ✅ FIXED: Tidak kirim confirmPassword ke backend (security best practice)
-  Map<String, dynamic> toRegisterJson(String password, String passwordConfirmation) {
+  // ✅ FIX: tambahkan parameter source agar dikirim ke backend
+  Map<String, dynamic> toRegisterJson(
+      String password,
+      String passwordConfirmation, {
+        String? source,
+      }) {
     return {
       'name': fullName,
       'email': email,
       'password': password,
-      'confirmPassword': passwordConfirmation, // Backend Laravel butuh ini untuk validasi same:password
+      'confirmPassword': passwordConfirmation,
       'noTelephone': phoneNumber,
+      // ✅ kirim source jika ada (nullable di backend)
+      if (source != null && source.trim().isNotEmpty) 'source': source.trim(),
     };
   }
 
@@ -103,15 +109,25 @@ class Owner extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, fullName, email, password, confirmPassword, phoneNumber, companyId, role, createdAt, updatedAt];
+  List<Object?> get props => [
+    id,
+    fullName,
+    email,
+    password,
+    confirmPassword,
+    phoneNumber,
+    companyId,
+    role,
+    createdAt,
+    updatedAt,
+  ];
 }
 
-// ✅ FIXED: Tambahkan error details dari backend
 class RegisterResponse {
   final bool success;
   final String? message;
   final RegisterData? data;
-  final Map<String, String>? errors; // ✅ NEW: untuk error spesifik per field
+  final Map<String, String>? errors;
 
   RegisterResponse({
     required this.success,
@@ -124,14 +140,16 @@ class RegisterResponse {
     final meta = json['meta'];
     final data = json['data'];
 
-    // ✅ Extract error details jika ada
     Map<String, String>? fieldErrors;
     if (data != null && data is Map<String, dynamic>) {
-      // Cek apakah data berisi error messages (dari backend Laravel)
       if (data.containsKey('email') || data.containsKey('phone')) {
         fieldErrors = {};
-        if (data['email'] != null) fieldErrors['email'] = data['email'].toString();
-        if (data['phone'] != null) fieldErrors['phone'] = data['phone'].toString();
+        if (data['email'] != null) {
+          fieldErrors['email'] = data['email'].toString();
+        }
+        if (data['phone'] != null) {
+          fieldErrors['phone'] = data['phone'].toString();
+        }
       }
     }
 
@@ -188,11 +206,11 @@ class ResendOtpResponse {
     final data = json['data'];
 
     return ResendOtpResponse(
-        success: (meta?['code'] == 200 || meta?['code'] == 201) ||
-            (meta?['status'] == true),
-        message: meta?['message'] ?? 'Unknown error',
-        userId: data?['user_id'],
-        otpSent: data?['otp_sent']
+      success: (meta?['code'] == 200 || meta?['code'] == 201) ||
+          (meta?['status'] == true),
+      message: meta?['message'] ?? 'Unknown error',
+      userId: data?['user_id'],
+      otpSent: data?['otp_sent'],
     );
   }
 }

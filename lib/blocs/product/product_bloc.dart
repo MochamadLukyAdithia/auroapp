@@ -16,10 +16,29 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<AddProduct>(_onAddProduct);
     on<UpdateProduct>(_onUpdateProduct);
     on<DeleteProduct>(_onDeleteProduct);
+    on<CheckProductCode>(_onCheckProductCode);
     on<FilterProductsByCategory>(_onFilterProductsByCategory);
   }
 
+  Future<void> _onCheckProductCode(
+      CheckProductCode event,
+      Emitter<ProductState> emit,
+      ) async {
+    if (event.code.trim().isEmpty) return;
 
+    emit(const ProductCodeChecking());
+
+    final isDuplicate = await _productRepository.checkProductCode(
+      event.code.trim(),
+      excludeId: event.excludeId,
+    );
+
+    if (isDuplicate) {
+      emit(const ProductCodeDuplicate());
+    } else {
+      emit(const ProductCodeAvailable());
+    }
+  }
   Future<void> _onLoadProducts(
       LoadProducts event,
       Emitter<ProductState> emit,

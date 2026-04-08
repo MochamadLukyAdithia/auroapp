@@ -366,7 +366,7 @@ class SplashPage2 extends StatelessWidget {
                     SizedBox(height: isLandscape ? 8 : r.spacing(mobile: 12, tablet: 16)),
 
                     Text(
-                      'DI AURO PAY',
+                      'DI AURO',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: isLandscape ? 24 : r.fontSize(mobile: 32, tablet: 48),
@@ -476,7 +476,7 @@ class SplashPage3 extends StatelessWidget {
 
                 // Description
                 Text(
-                  'Mari kita mulai perjalanan bisnis Anda bersama AURO PAY',
+                  'Mari kita mulai perjalanan bisnis Anda bersama AURO',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: isLandscape ? 13 : r.fontSize(mobile: 16, tablet: 20),

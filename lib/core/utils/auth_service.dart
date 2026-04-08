@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   static const String ROLE_OWNER = 'owner';
   static const String ROLE_CASHIER = 'cashier';
+  static const String ROLE_ADMIN = 'admin';
 
-  // cek apakah owner atau cashier
   static Future<bool> isOwner() async {
     final role = await getCurrentRole();
     return role == ROLE_OWNER;

@@ -15,6 +15,9 @@ class RegisterState extends Equatable {
   final String? passwordError;
   final String? confirmPasswordError;
   final String? phoneError;
+  final String? source;
+  // ✅ FIX: pisahkan sourceError dari source agar tidak konflik
+  final String? sourceError;
   final int? userId;
   final bool hasExistingOwner;
   final String existingOwnerEmail;
@@ -32,24 +35,28 @@ class RegisterState extends Equatable {
     this.passwordError,
     this.confirmPasswordError,
     this.phoneError,
+    this.source,
+    this.sourceError,
     this.hasExistingOwner = false,
     this.existingOwnerEmail = '',
     this.userId,
   });
 
-  // Getter untuk validasi
   bool get isNameValid => name.trim().isNotEmpty;
   bool get isEmailValid => email.contains('@') && email.contains('.');
-  bool get isPasswordValid => password.length >= 6;
-  bool get isConfirmPasswordValid => confirmPassword == password && confirmPassword.isNotEmpty;
+  bool get isPasswordValid => password.length >= 8;
+  bool get isConfirmPasswordValid =>
+      confirmPassword == password && confirmPassword.isNotEmpty;
   bool get isPhoneValid => phone.trim().isNotEmpty && phone.length >= 10;
+  bool get isSourceValid => source != null && source!.trim().isNotEmpty;
 
   bool get isFormValid =>
       isNameValid &&
           isEmailValid &&
           isPasswordValid &&
           isConfirmPasswordValid &&
-          isPhoneValid;
+          isPhoneValid &&
+          isSourceValid;
 
   RegisterState copyWith({
     String? name,
@@ -64,10 +71,12 @@ class RegisterState extends Equatable {
     String? passwordError,
     String? confirmPasswordError,
     String? phoneError,
+    String? source,
+    // ✅ FIX: sourceError sekarang field terpisah
+    String? sourceError,
     bool? hasExistingOwner,
     String? existingOwnerEmail,
-    int? userId
-
+    int? userId,
   }) {
     return RegisterState(
       name: name ?? this.name,
@@ -82,6 +91,9 @@ class RegisterState extends Equatable {
       passwordError: passwordError,
       confirmPasswordError: confirmPasswordError,
       phoneError: phoneError,
+      // ✅ source harus dipertahankan jika tidak diubah
+      source: source ?? this.source,
+      sourceError: sourceError,
       hasExistingOwner: hasExistingOwner ?? this.hasExistingOwner,
       existingOwnerEmail: existingOwnerEmail ?? this.existingOwnerEmail,
       userId: userId ?? this.userId,
@@ -102,7 +114,10 @@ class RegisterState extends Equatable {
     passwordError,
     confirmPasswordError,
     phoneError,
+    source,
+    sourceError,
     hasExistingOwner,
     existingOwnerEmail,
+    userId,
   ];
 }

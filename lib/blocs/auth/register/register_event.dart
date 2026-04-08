@@ -51,7 +51,18 @@ class RegisterPhoneChanged extends RegisterEvent {
   @override
   List<Object?> get props => [phone];
 }
+class RegisterSourceChanged extends RegisterEvent {
+  final String source;
+
+  const RegisterSourceChanged(this.source);
+
+  @override
+  List<Object?> get props => [source];
+}
 
 class RegisterSubmitted extends RegisterEvent {
   const RegisterSubmitted();
+}
+class RegisterReset extends RegisterEvent {
+  const RegisterReset();
 }

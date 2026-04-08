@@ -13,6 +13,7 @@ class TransactionReport {
   final String metode;
   final String? namaBiayaLain;
   final double biayaLain;
+  final int totalItem;
 
   TransactionReport({
     required this.id,
@@ -29,6 +30,7 @@ class TransactionReport {
     required this.metode,
     this.namaBiayaLain,
     required this.biayaLain,
+    required this.totalItem,
   });
 
   factory TransactionReport.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class TransactionReport {
       metode: json['metode'] ?? '-',
       namaBiayaLain: json['namaBiayaLain'],
       biayaLain: _parseDouble(json['biayaLain']),
+      totalItem: json['totalItem'] ?? 0,
     );
   }
 

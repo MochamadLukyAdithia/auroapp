@@ -64,10 +64,7 @@ class SalesReportState extends Equatable {
 
   // Total item terjual (dihitung dari transaksi yang ada)
   double get totalItemsSold {
-    return transactions.fold<double>(
-      0,
-          (sum, t) => sum + 1, // Asumsi 1 transaksi = 1 item, sesuaikan jika ada data quantity
-    );
+    return transactions.fold<double>(0, (sum, t) => sum + t.totalItem);
   }
 
   // Data untuk grafik berdasarkan transaksi

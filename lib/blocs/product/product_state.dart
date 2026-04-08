@@ -116,3 +116,15 @@ class ProductCannotDelete extends ProductState {
   List<Object?> get props => [message];
 }
 
+
+class ProductCodeChecking extends ProductState {
+  const ProductCodeChecking();
+}
+
+class ProductCodeAvailable extends ProductState {
+  const ProductCodeAvailable();
+}
+
+class ProductCodeDuplicate extends ProductState {
+  const ProductCodeDuplicate();
+}

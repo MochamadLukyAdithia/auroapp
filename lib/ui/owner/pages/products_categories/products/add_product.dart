@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -38,15 +39,40 @@ class _AddProductPageState extends State<AddProductPage> {
   int? _selectedCategoryId;
   String? _selectedCategoryName;
   File? _selectedImage;
+  bool _isCodeDuplicate = false;
+  bool _isCheckingCode = false;
+  Timer? _debounce;
+
 
   @override
   void initState() {
     super.initState();
     context.read<CategoryBloc>().add(const LoadCategories());
   }
+  void _onCodeChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    if (value.trim().isEmpty) {
+      setState(() {
+        _isCodeDuplicate = false;
+        _isCheckingCode = false;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingCode = true);
+
+    _debounce = Timer(const Duration(milliseconds: 600), () {
+      context.read<ProductBloc>().add(
+        CheckProductCode(code: value.trim()),
+      );
+    });
+  }
+
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _nameController.dispose();
     _codeController.dispose();
     _basePriceController.dispose();
@@ -57,42 +83,47 @@ class _AddProductPageState extends State<AddProductPage> {
     _descriptionController.dispose();
     super.dispose();
   }
-
   void _saveProduct() {
     if (_isSubmitting) return;
-    if (_formKey.currentState!.validate()) {
-      if (_selectedCategoryId == null) {
-        FloatingMessage.show(
-          context,
-          message: 'Pilih kategori terlebih dahulu',
-          textOnly: true,
-          backgroundColor: primaryGreenColor,
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) return;
 
-      setState(() => _isSubmitting = true);
-      context.read<ProductBloc>().add(
-        AddProduct(
-          name: _nameController.text,
-          categoryId: _selectedCategoryId!,
-          code: _codeController.text,
-          basePrice: double.parse(_basePriceController.text),
-          sellingPrice: double.parse(_sellingPriceController.text),
-          stock: int.parse(_stockController.text),
-          unit: _unitController.text,
-          discount: _discountController.text.isEmpty
-              ? 0
-              : double.parse(_discountController.text),
-          description: _descriptionController.text.isEmpty
-              ? null
-              : _descriptionController.text,
-          photoFile: _selectedImage
-        ),
+    // Guard duplikat kode
+    if (_isCodeDuplicate) {
+      FloatingMessage.show(
+        context,
+        message: 'Kode produk sudah digunakan di toko ini',
+        textOnly: true,
+        backgroundColor: Colors.red,
       );
+      return;
     }
-  }
 
+    if (_selectedCategoryId == null) {
+      FloatingMessage.show(
+        context,
+        message: 'Pilih kategori terlebih dahulu',
+        textOnly: true,
+        backgroundColor: primaryGreenColor,
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    context.read<ProductBloc>().add(AddProduct( name: _nameController.text,
+      categoryId: _selectedCategoryId!,
+      code: _codeController.text,
+      basePrice: double.parse(_basePriceController.text),
+      sellingPrice: double.parse(_sellingPriceController.text),
+      stock: int.parse(_stockController.text),
+      unit: _unitController.text,
+      discount: _discountController.text.isEmpty
+          ? 0
+          : double.parse(_discountController.text),
+      description: _descriptionController.text.isEmpty
+          ? null
+          : _descriptionController.text,
+      photoFile: _selectedImage,));
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,6 +135,22 @@ class _AddProductPageState extends State<AddProductPage> {
           }
           if (state is ProductActionSuccess) {
             Navigator.pop(context, true);
+          }
+          if (state is ProductCodeChecking) {
+            setState(() {
+              _isCheckingCode = true;
+              _isCodeDuplicate = false;
+            });
+          } else if (state is ProductCodeAvailable) {
+            setState(() {
+              _isCheckingCode = false;
+              _isCodeDuplicate = false;
+            });
+          } else if (state is ProductCodeDuplicate) {
+            setState(() {
+              _isCheckingCode = false;
+              _isCodeDuplicate = true;
+            });
           }
         },
           child:
@@ -130,10 +177,13 @@ class _AddProductPageState extends State<AddProductPage> {
                     selectedCategoryName: _selectedCategoryName,
                     onCategorySelected: (categoryId, categoryName) {
                       setState(() {
-                        _selectedCategoryId = categoryId as int?;
+                        _selectedCategoryId = categoryId;
                         _selectedCategoryName = categoryName;
                       });
                     },
+                      onCodeChanged: _onCodeChanged,
+                      isCheckingCode: _isCheckingCode,
+                      isCodeDuplicate: _isCodeDuplicate
                   ),
                   const SizedBox(height: 16),
                   PriceField(
@@ -151,6 +201,10 @@ class _AddProductPageState extends State<AddProductPage> {
                   DescriptionField(controller: _descriptionController),
                   const SizedBox(height: 30),
                   BlocBuilder<ProductBloc, ProductState>(
+                    buildWhen: (previous, current) =>
+                    current is ProductLoading ||
+                        current is ProductActionSuccess ||
+                        current is ProductError,
                     builder: (context, state) {
                       return SaveButton(
                         onPressed: _saveProduct,
@@ -271,12 +325,18 @@ class CategoryAndCodeField extends StatelessWidget {
   final TextEditingController codeController;
   final String? selectedCategoryName;
   final Function(int categoryId, String categoryName) onCategorySelected;
+  final Function(String) onCodeChanged;
+  final bool isCheckingCode;
+  final bool isCodeDuplicate;
 
   const CategoryAndCodeField({
     super.key,
     required this.codeController,
     required this.selectedCategoryName,
     required this.onCategorySelected,
+    required this.onCodeChanged,
+    this.isCheckingCode = false,
+    this.isCodeDuplicate = false,
   });
 
   void _showCategoryBottomSheet(BuildContext context) {
@@ -556,6 +616,24 @@ class CategoryAndCodeField extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
               ),
+              if (isCheckingCode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 4),
+                  child: Text('Memeriksa kode...',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                )
+              else if (isCodeDuplicate)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4, left: 4),
+                  child: Text('Kode sudah dipakai di toko ini',
+                      style: TextStyle(fontSize: 11, color: Colors.red)),
+                )
+              else if (codeController.text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 4),
+                    child: Text('Kode tersedia',
+                        style: TextStyle(fontSize: 11, color: Colors.green[600])),
+                  ),
             ],
           ),
         ),
@@ -600,8 +678,16 @@ class PriceField extends StatelessWidget {
                   if (value == null || value.isEmpty) {
                     return 'Harga dasar wajib diisi';
                   }
-                  if (double.parse(value) <= 0) {
+                  final base = double.parse(value);
+                  if (base <= 0) {
                     return 'Harga harus > 0';
+                  }
+                  final sellingText = sellingPriceController.text;
+                  if (sellingText.isNotEmpty) {
+                    final selling = double.parse(sellingText);
+                    if (selling <= base) {
+                      return 'Harga dasar harus lebih kecil dari harga jual';
+                    }
                   }
                   return null;
                 },
@@ -624,6 +710,7 @@ class PriceField extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
               ),
+
             ],
           ),
         ),
@@ -649,8 +736,16 @@ class PriceField extends StatelessWidget {
                   if (value == null || value.isEmpty) {
                     return 'Harga jual wajib diisi';
                   }
-                  if (double.parse(value) <= 0) {
+                  final selling = double.parse(value);
+                  if (selling <= 0) {
                     return 'Harga harus > 0';
+                  }
+                  final baseText = basePriceController.text;
+                  if (baseText.isNotEmpty) {
+                    final base = double.parse(baseText);
+                    if (selling <= base) {
+                      return 'Harga jual harus lebih besar dari harga dasar';
+                    }
                   }
                   return null;
                 },

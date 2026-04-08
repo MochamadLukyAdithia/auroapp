@@ -882,13 +882,22 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
-                      _buildQuickChip('5%', 5),
-                      _buildQuickChip('10%', 10),
-                      _buildQuickChip('15%', 15),
-                      _buildQuickChip('20%', 20),
-                      _buildQuickChip('25%', 25),
-                      _buildQuickChip('50%', 50),
+                    children: _isPercentMode
+                        ? [
+                      _buildQuickChipPercent('5%', 5),
+                      _buildQuickChipPercent('10%', 10),
+                      _buildQuickChipPercent('15%', 15),
+                      _buildQuickChipPercent('20%', 20),
+                      _buildQuickChipPercent('25%', 25),
+                      _buildQuickChipPercent('50%', 50),
+                    ]
+                        : [
+                      _buildQuickChipRupiah('1.000', 1000),
+                      _buildQuickChipRupiah('5.000', 5000),
+                      _buildQuickChipRupiah('10.000', 10000),
+                      _buildQuickChipRupiah('20.000', 20000),
+                      _buildQuickChipRupiah('50.000', 50000),
+                      _buildQuickChipRupiah('100.000', 100000),
                     ],
                   ),
 
@@ -1061,7 +1070,8 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
     );
   }
 
-  Widget _buildQuickChip(String label, int percent) {
+
+  Widget _buildQuickChipPercent(String label, int percent) {
     return InkWell(
       onTap: () {
         setState(() {
@@ -1069,6 +1079,34 @@ class _DiscountBottomSheetState extends State<DiscountBottomSheet> {
           _controller.text = percent.toString();
         });
         context.read<TransactionCubit>().setDiscountPercent(percent);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: primaryGreenColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: primaryGreenColor.withOpacity(0.3)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: fontType,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: primaryGreenColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickChipRupiah(String label, int amount) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _controller.text = amount.toString();
+        });
+        context.read<TransactionCubit>().setDiscountAmount(amount);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

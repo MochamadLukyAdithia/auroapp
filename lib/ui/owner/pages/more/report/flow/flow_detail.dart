@@ -41,7 +41,7 @@ class FlowDetailPage extends StatelessWidget {
         'date': DateTime.parse(transaction.tanggal),
         'type': 'sales',
         'description': 'Transaksi #${transaction.kodeTransaksi}',
-        'amount': transaction.bayar.toInt(),
+        'amount': transaction.totalPenjualan.toInt(),
         'profit': transaction.keuntungan.toInt(),
         'data': transaction,
       });
@@ -63,7 +63,7 @@ class FlowDetailPage extends StatelessWidget {
     items.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
     // Hitung summary untuk hari ini
-    final totalSales = transactions.fold<double>(0, (sum, t) => sum + t.bayar);
+    final totalSales = transactions.fold<double>(0, (sum, t) => sum + t.totalPenjualan);
     final totalIncome = finances
         .where((f) => f.type == FinanceType.income)
         .fold<double>(0, (sum, f) => sum + f.amount);

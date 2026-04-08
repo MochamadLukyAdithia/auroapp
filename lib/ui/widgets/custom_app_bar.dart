@@ -39,7 +39,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           const SizedBox(width: 8),
           const Text(
-            'Auro Pay',
+            'Auro',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
