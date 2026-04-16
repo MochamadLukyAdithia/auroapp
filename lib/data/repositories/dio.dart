@@ -15,7 +15,7 @@ Dio dio() {
   );
 
   // Base URL & Headers
-  dio.options.baseUrl = "https://api.auroapp.id//api/v1";
+  dio.options.baseUrl = "https://api.auroapp.id/api/v1";
   dio.options.headers['accept'] = 'application/json';
   dio.options.connectTimeout = const Duration(seconds: 30);
   dio.options.receiveTimeout = const Duration(seconds: 30);
@@ -30,7 +30,6 @@ Dio dio() {
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
-
         return handler.next(options);
       },
       onError: (error, handler) async {

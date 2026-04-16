@@ -1,6 +1,14 @@
 import 'package:equatable/equatable.dart';
 
-enum LoginStatus { initial, loading, success, failure, authenticated, unauthenticated, needsVerification }
+enum LoginStatus {
+  initial,
+  loading,
+  success,
+  failure,
+  authenticated,
+  unauthenticated,
+  needsVerification
+}
 
 class LoginState extends Equatable {
   final String email;
@@ -11,7 +19,7 @@ class LoginState extends Equatable {
   final String? passwordError;
   final int? userId;
   final String? userEmail;
-
+  final String? role;
 
   const LoginState({
     this.email = '',
@@ -21,10 +29,11 @@ class LoginState extends Equatable {
     this.emailError,
     this.passwordError,
     this.userId,
-    this.userEmail
+    this.userEmail,
+    this.role,
   });
 
-  // Getter untuk validasi
+  // 🔹 Getter validasi
   bool get isEmailValid => email.contains('@') && email.contains('.');
   bool get isPasswordValid => password.length >= 6;
   bool get isFormValid => isEmailValid && isPasswordValid;
@@ -37,7 +46,8 @@ class LoginState extends Equatable {
     String? emailError,
     String? passwordError,
     int? userId,
-    String? userEmail
+    String? userEmail,
+    String? role, // 🔥 TAMBAHKAN INI
   }) {
     return LoginState(
       email: email ?? this.email,
@@ -48,6 +58,7 @@ class LoginState extends Equatable {
       passwordError: passwordError,
       userId: userId ?? this.userId,
       userEmail: userEmail ?? this.userEmail,
+      role: role ?? this.role, // 🔥 DAN INI
     );
   }
 
@@ -60,6 +71,7 @@ class LoginState extends Equatable {
     emailError,
     passwordError,
     userId,
-    userEmail
+    userEmail,
+    role,
   ];
 }

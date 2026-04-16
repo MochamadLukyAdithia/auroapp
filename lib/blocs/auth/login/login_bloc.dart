@@ -130,35 +130,47 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
       LoginResponse response,
       Emitter<LoginState> emit,
       ) async {
-    // ✅ SUCCESS - Login berhasil
-    if (response.success && response.data != null) {
-      // Check if owner needs verification
-      if (response.data!.requiresVerification == true) {
-        emit(state.copyWith(
-          status: LoginStatus.needsVerification,
-          userId: response.data!.userId,
-          userEmail: response.data!.email,
-        ));
-        return;
-      }
 
-      // Normal login - validate data
-      if (!_isLoginDataComplete(response.data!)) {
-        emit(state.copyWith(
-          status: LoginStatus.failure,
-          errorMessage: 'Data login tidak lengkap dari server',
-        ));
-        return;
-      }
-
-      // Save login data
-      await _saveLoginData(response.data!);
-
-      emit(state.copyWith(status: LoginStatus.success));
-    }
-    // ❌ FAILURE - Parse error dari backend
-    else {
+    if (!response.success || response.data == null) {
       _handleLoginError(response.message ?? 'Login gagal', emit);
+      return;
+    }
+
+    final data = response.data!;
+
+
+    if (data.requiresVerification == true) {
+      emit(state.copyWith(
+        status: LoginStatus.needsVerification,
+        userId: data.userId,
+        userEmail: data.email,
+      ));
+      return;
+    }
+
+    // 🔹 Validasi data penting
+    if (!_isLoginDataComplete(data)) {
+      emit(state.copyWith(
+        status: LoginStatus.failure,
+        errorMessage: 'Data login tidak lengkap dari server',
+      ));
+      return;
+    }
+
+    try {
+      // 🔹 Simpan ke local storage
+      await _saveLoginData(data);
+
+      // 🔥 Emit success + role
+      emit(state.copyWith(
+        status: LoginStatus.success,
+        role: data.role, // ✅ clean & aman
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        status: LoginStatus.failure,
+        errorMessage: 'Gagal menyimpan data login',
+      ));
     }
   }
 
